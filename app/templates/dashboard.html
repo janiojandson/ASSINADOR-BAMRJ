@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #002244; color: white; padding: 15px; border-radius: 5px;">
+    <div>
+        <h3 style="margin: 0;">👤 {{ session.username }} [{{ role }}]</h3>
+        {% if is_substitute %}<span style="background: #ffcc00; color: black; padding: 2px 8px; border-radius: 3px; font-weight: bold; font-size: 0.8em;">MODO SUBSTITUTO ATIVO</span>{% endif %}
+    </div>
+    <div style="display: flex; gap: 10px;">
+        {% if role in ['Chefe_Departamento', 'Vice_Diretor'] %}
+            <a href="{{ url_for('main.toggle_substitute') }}" style="background: #ffcc00; color: black; text-decoration: none; padding: 8px 12px; border-radius: 4px; font-weight: bold;">
+                {% if is_substitute %} ⬅️ Voltar {% else %} ⚡ Substituição Superior {% endif %}
+            </a>
+        {% endif %}
+        <form action="{{ url_for('main.index') }}" method="GET" style="display: flex;">
+            <input type="text" name="q" placeholder="Buscar..." style="padding: 8px; border: none;">
+            <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none;">🔍</button>
+        </form>
+    </div>
+</div>
+
+{% if role == 'Admin' %}
+<div class="card" style="border-top: 5px solid #dc3545;">
+    <h3>🛡️ Gestão de Usuários</h3>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ddd;">
+        <h4 style="margin-top:0">➕ Cadastrar Novo Militar</h4>
+        <form action="{{ url_for('main.create_user') }}" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="text" name="username" placeholder="Login/Nome" required style="padding: 8px; flex: 1;">
+            <input type="password" name="password" placeholder="Senha Inicial" required style="padding: 8px; flex: 1;">
+            <select name="role" required style="padding: 8px; flex: 1;">
+                <option value="Operador">Operador</option>
+                <option value="Encarregado">Encarregado</option>
+                <option value="Ajudante_Encarregado">Ajudante do Encarregado</option>
+                <option value="Chefe_Departamento">Chefe de Departamento</option>
+                <option value="Vice_Diretor">Vice-Diretor</option>
+                <option value="Diretor">Diretor</option>
+            </select>
+            <button type="submit" style="background: #28a745; color: white; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold;">Salvar Usuário</button>
+        </form>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead><tr style="text-align: left; border-bottom: 2px solid #eee;"><th>Usuário</th><th>Hierarquia</th><th>Ações</th></tr></thead>
+        <tbody>
+            {% for u in users %}
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;"><b>{{ u.username }}</b></td>
+                <td>
+                    <form action="{{ url_for('main.edit_user') }}" method="POST" style="display: inline;">
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <select name="role" onchange="this.form.submit()" style="padding: 5px;">
+                            <option value="Admin" {% if u.role == 'Admin' %}selected{% endif %}>Administrador</option>
+                            <option value="Operador" {% if u.role == 'Operador' %}selected{% endif %}>Operador</option>
+                            <option value="Encarregado" {% if u.role == 'Encarregado' %}selected{% endif %}>Encarregado</option>
+                            <option value="Ajudante_Encarregado" {% if u.role == 'Ajudante_Encarregado' %}selected{% endif %}>Ajudante do Encarregado</option>
+                            <option value="Chefe_Departamento" {% if u.role == 'Chefe_Departamento' %}selected{% endif %}>Chefe Departamento</option>
+                            <option value="Vice_Diretor" {% if u.role == 'Vice_Diretor' %}selected{% endif %}>Vice-Diretor</option>
+                            <option value="Diretor" {% if u.role == 'Diretor' %}selected{% endif %}>Diretor</option>
+                        </select>
+                    </form>
+                </td>
+                <td>{% if u.username != 'admin' %}<a href="{{ url_for('main.delete_user', user_id=u.id) }}" style="color: red; text-decoration: none;" onclick="return confirm('Excluir militar?')">❌ Excluir</a>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if role == 'Operador' %}
+<button onclick="document.getElementById('modal').style.display='block'" style="background: #28a745; color: white; padding: 12px 20px; border: none; cursor: pointer; margin-bottom: 20px; font-weight: bold;">➕ Iniciar Novo Processo</button>
+<div id="modal" class="card" style="display: none; border-left: 10px solid #28a745;">
+    <h3>📄 Abertura de Demanda</h3>
+    <form action="{{ url_for('main.upload_document') }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="protocol" value="{{ pre_protocol }}">
+        <p style="background: #fff3cd; padding: 10px; border-radius: 5px;"><strong>Protocolo Gerado:</strong> {{ pre_protocol }}</p>
+        <input type="text" name="process_name" placeholder="Assunto do Processo" required style="width: 100%; padding: 10px; margin-bottom: 10px;">
+        <label style="display: block; margin-bottom: 15px;"><input type="checkbox" name="priority" value="1"> 🚩 Processo Prioritário</label>
+        
+        <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+            <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                <label><b>Minutas (PDF):</b></label><br>
+                <input type="file" id="m-in" accept="application/pdf" multiple style="margin-top:5px">
+                <ul id="m-list" style="font-size: 0.85em; color: #666; padding-left: 20px;"></ul>
+                <input type="file" name="minutas" id="m-hidden" multiple style="display: none;">
+            </div>
+            <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                <label><b>Anexos (PDF):</b></label><br>
+                <input type="file" id="a-in" accept="application/pdf" multiple style="margin-top:5px">
+                <ul id="a-list" style="font-size: 0.85em; color: #666; padding-left: 20px;"></ul>
+                <input type="file" name="anexos" id="a-hidden" multiple style="display: none;">
+            </div>
+        </div>
+        <textarea name="observation" placeholder="Observações iniciais..." style="width: 100%; height: 60px; margin-bottom: 10px; padding: 5px;"></textarea>
+        <button type="submit" style="background: #003366; color: white; padding: 10px 25px; border: none; cursor: pointer; font-weight: bold;">Gerar e Tramitar</button>
+        <button type="button" onclick="location.reload()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; cursor: pointer;">Cancelar</button>
+    </form>
+</div>
+
+<script>
+    const dtM = new DataTransfer(), dtA = new DataTransfer();
+    function setup(inId, hidId, listId, dt) {
+        const inp = document.getElementById(inId), hid = document.getElementById(hidId), list = document.getElementById(listId);
+        inp.addEventListener('change', () => {
+            for(let f of inp.files) dt.items.add(f);
+            render();
+        });
+        function render() {
+            list.innerHTML = ''; hid.files = dt.files;
+            Array.from(dt.files).forEach((f, i) => {
+                const li = document.createElement('li');
+                li.innerHTML = f.name + ' <b onclick="rem('+i+', \''+listId+'\')" style="cursor:pointer;color:red;margin-left:10px">X</b>';
+                list.appendChild(li);
+            });
+        }
+        window.rem = (i, lId) => { 
+            const activeDt = (lId === 'm-list') ? dtM : dtA;
+            activeDt.items.remove(i); 
+            (lId === 'm-list') ? setup('m-in', 'm-hidden', 'm-list', dtM).render() : setup('a-in', 'a-hidden', 'a-list', dtA).render();
+            location.reload(); 
+        };
+    }
+    setup('m-in', 'm-hidden', 'm-list', dtM);
+    setup('a-in', 'a-hidden', 'a-list', dtA);
+</script>
+{% endif %}
+
+<div class="card">
+    <h3>📂 Processos na Caixa</h3>
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd;"><th>Prior.</th><th>Protocolo</th><th>Assunto</th><th>Status</th><th>Ação</th></tr>
+        {% for doc in documents %}
+        <tr style="border-bottom: 1px solid #eee; {% if doc.is_priority %} background: #fff5f5; {% endif %}">
+            <td style="padding: 10px; text-align: center;">{{ '🚩' if doc.is_priority else '🏳️' }}</td>
+            <td style="padding: 10px;"><code>{{ doc.protocol }}</code></td>
+            <td style="padding: 10px;">{{ doc.name }}</td>
+            <td style="padding: 10px;"><span style="font-size: 0.8em; background: #e2e3e5; padding: 3px 7px; border-radius: 4px;">{{ doc.status }}</span></td>
+            <td style="padding: 10px;"><a href="{{ url_for('main.view_process', doc_id=doc.id) }}" style="background: #003366; color: white; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em;">Abrir Processo</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}
