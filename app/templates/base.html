@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assinador-BAMRJ</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/brasao_bamrj.png') }}" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -63,19 +64,35 @@
             border-radius: 4px;
             padding: 8px;
         }
+
+        /* --- CSS DE RESPONSIVIDADE TÁTICA --- */
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        
+        @media (max-width: 768px) {
+            nav { flex-direction: column; gap: 15px; text-align: center; padding: 15px; }
+            .nav-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+            .nav-actions span { border-right: none !important; padding-right: 0 !important; margin-right: 0 !important; display: block; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;}
+            .nav-actions a { margin-left: 0; display: block; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 4px;}
+            main { padding: 10px; }
+            .flex-mobile { flex-direction: column !important; }
+            .flex-mobile-form { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+            .flex-mobile-form select, .flex-mobile-form input, .flex-mobile-form button { width: 100% !important; margin-bottom: 5px; box-sizing: border-box;}
+            .mobile-action-buttons form { width: 100%; margin-bottom: 5px; }
+            .mobile-action-buttons button, .mobile-action-buttons a { width: 100%; text-align: center; display: block; box-sizing: border-box; margin-bottom: 5px;}
+        }
     </style>
 </head>
 <body>
     <nav>
         <div style="display: flex; align-items: center; gap: 15px;">
             <img src="{{ url_for('static', filename='img/brasao_bamrj.png') }}" alt="Brasão BAMRJ" style="height: 45px;">
-            <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; flex-direction: column; text-align: left;">
                 <strong style="font-size: 1.2em; letter-spacing: 1px; line-height: 1.1;">Assinador-BAMRJ</strong>
                 <span style="font-size: 0.75em; color: var(--gold); font-weight: bold;">DIVISÃO DE FINANÇAS</span>
             </div>
         </div>
         
-        <div>
+        <div class="nav-actions">
             {% if session.get('user_id') %}
                 <span style="border-right: 1px solid rgba(255,255,255,0.3); padding-right: 15px; margin-right: 15px;">
                     <i class="fas fa-user-shield"></i> {{ session.get('role') }}
