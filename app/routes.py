@@ -169,5 +169,26 @@ def view_process(doc_id):
     doc = Document.query.get_or_404(doc_id)
     return render_template('viewer.html', doc=doc, role=session.get('role'))
 
+@main.route('/arquivo')
+def arquivo():
+    if 'user_id' not in session: return redirect(url_for('main.login'))
+    
+    role = session.get('role')
+    search_query = request.args.get('q', '')
+    
+    # Busca apenas processos Arquivados ou Cancelados
+    query = Document.query.filter(Document.status.in_(['Arquivado', 'Cancelado']))
+    
+    if search_query:
+        query = query.filter(
+            (Document.name.ilike(f'%{search_query}%')) | 
+            (Document.protocol.ilike(f'%{search_query}%')) | 
+            (Document.cpf_cnpj.ilike(f'%{search_query}%'))
+        )
+        
+    documents = query.order_by(Document.created_at.desc()).all()
+    
+    return render_template('arquivo.html', documents=documents, role=role)
+
 @main.route('/get_pdf/<path:filename>')
 def get_pdf(filename): return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)

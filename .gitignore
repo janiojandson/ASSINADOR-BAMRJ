@@ -1,0 +1,11 @@
+# Ambientes e Credenciais
+.env
+__pycache__/
+*.pyc
+
+# Banco de Dados Local
+instance/
+*.db
+
+# Uploads e Documentos de Teste
+app/uploads/

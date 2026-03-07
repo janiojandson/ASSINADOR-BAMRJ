@@ -73,7 +73,11 @@
 {% endif %}
 
 {% if role == 'Operador' %}
-<button onclick="document.getElementById('modal').style.display='block'" style="background: #28a745; color: white; padding: 12px 20px; border: none; cursor: pointer; margin-bottom: 20px; font-weight: bold;">➕ Iniciar Novo Processo</button>
+<div style="display: flex; gap: 10px; margin-bottom: 20px;">
+    <button onclick="document.getElementById('modal').style.display='block'" style="background: #28a745; color: white; padding: 12px 20px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px;">➕ Iniciar Novo Processo</button>
+    <a href="{{ url_for('main.arquivo') }}" style="background: #17a2b8; color: white; padding: 12px 20px; text-decoration: none; cursor: pointer; font-weight: bold; border-radius: 4px;">🗄️ Acessar Arquivo Geral</a>
+</div>
+
 <div id="modal" class="card" style="display: none; border-left: 10px solid #28a745;">
     <h3>📄 Abertura de Demanda</h3>
     <form action="{{ url_for('main.upload_document') }}" method="POST" enctype="multipart/form-data">

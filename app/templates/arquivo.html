@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #002244; color: white; padding: 15px; border-radius: 5px;">
+    <div>
+        <h3 style="margin: 0;">🗄️ Arquivo Geral de Processos</h3>
+        <p style="margin: 5px 0 0 0; font-size: 0.85em; color: #ccc;">Consulta de processos finalizados e cancelados.</p>
+    </div>
+    <form action="{{ url_for('main.arquivo') }}" method="GET" style="display: flex;">
+        <input type="text" name="q" placeholder="Buscar no arquivo (Nome, CNPJ...)" style="padding: 8px; border: none; width: 280px;">
+        <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none;">🔍</button>
+    </form>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="margin: 0;">📂 Processos Arquivados</h3>
+        <a href="{{ url_for('main.index') }}" style="background: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;">⬅ Voltar à Caixa de Entrada</a>
+    </div>
+    
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; text-align: left;">
+            <th style="padding: 10px;">Protocolo</th>
+            <th style="padding: 10px;">Assunto</th>
+            <th style="padding: 10px;">CPF/CNPJ</th>
+            <th style="padding: 10px;">Status Final</th>
+            <th style="padding: 10px;">Ação</th>
+        </tr>
+        
+        {% for doc in documents %}
+        <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 10px;"><code>{{ doc.protocol }}</code></td>
+            <td style="padding: 10px;">{{ doc.name }}</td>
+            <td style="padding: 10px;">{{ doc.cpf_cnpj or '-' }}</td>
+            <td style="padding: 10px;">
+                <span style="font-size: 0.8em; padding: 4px 8px; border-radius: 4px; font-weight: bold;
+                    {% if doc.status == 'Arquivado' %} background: #d4edda; color: #155724; 
+                    {% else %} background: #f8d7da; color: #721c24; {% endif %}">
+                    {{ doc.status }}
+                </span>
+            </td>
+            <td style="padding: 10px;">
+                <a href="{{ url_for('main.view_process', doc_id=doc.id) }}" style="background: #003366; color: white; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em;">Abrir</a>
+            </td>
+        </tr>
+        {% endfor %}
+        
+        {% if not documents %}
+        <tr>
+            <td colspan="5" style="text-align: center; padding: 30px; color: #666;">
+                Nenhum processo encontrado no arquivo.
+            </td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+{% endblock %}
