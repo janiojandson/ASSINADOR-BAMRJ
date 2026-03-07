@@ -18,14 +18,32 @@
         {% endif %}
         
         <form action="{{ url_for('main.index') }}" method="GET" style="display: flex; gap: 5px;">
-            <select name="ano" style="padding: 8px; border: none; border-radius: 3px;">
-                <option value="2026" selected>2026</option>
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-            </select>
+            <select name="ano" id="filtro-ano-dash" style="padding: 8px; border: none; border-radius: 3px; font-weight: bold; color: #002244;"></select>
             <input type="text" name="q" placeholder="Buscar por CNPJ/CPF, Nome..." style="padding: 8px; border: none; width: 250px; border-radius: 3px;">
             <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none; border-radius: 3px; cursor: pointer;">🔍</button>
         </form>
+
+        <script>
+            // Gera anos automaticamente a partir de 2026
+            const selectAnoDash = document.getElementById('filtro-ano-dash');
+            const anoAtualDash = new Date().getFullYear();
+            // Garante que se o relógio do PC estiver atrasado, o 2026 sempre apareça
+            const anoMaximoDash = anoAtualDash < 2026 ? 2026 : anoAtualDash;
+            
+            for (let ano = 2026; ano <= anoMaximoDash; ano++) {
+                let opt = document.createElement('option');
+                opt.value = ano;
+                opt.innerHTML = ano;
+                const urlParams = new URLSearchParams(window.location.search);
+                const anoPesquisado = urlParams.get('ano');
+                if (anoPesquisado && parseInt(anoPesquisado) === ano) {
+                    opt.selected = true;
+                } else if (!anoPesquisado && ano === anoMaximoDash) {
+                    opt.selected = true;
+                }
+                selectAnoDash.appendChild(opt);
+            }
+        </script>
     </div>
 </div>
 

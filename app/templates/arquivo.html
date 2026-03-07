@@ -8,14 +8,31 @@
     </div>
     
     <form action="{{ url_for('main.arquivo') }}" method="GET" style="display: flex; gap: 5px;">
-        <select name="ano" style="padding: 8px; border: none; border-radius: 3px;">
-            <option value="2026" selected>2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-        </select>
+        <select name="ano" id="filtro-ano-arq" style="padding: 8px; border: none; border-radius: 3px; font-weight: bold; color: #002244;"></select>
         <input type="text" name="q" placeholder="Buscar no arquivo (Nome, CNPJ...)" style="padding: 8px; border: none; width: 280px; border-radius: 3px;">
         <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none; border-radius: 3px; cursor: pointer;">🔍</button>
     </form>
+    
+    <script>
+        // Gera anos automaticamente a partir de 2026
+        const selectAnoArq = document.getElementById('filtro-ano-arq');
+        const anoAtualArq = new Date().getFullYear();
+        const anoMaximoArq = anoAtualArq < 2026 ? 2026 : anoAtualArq;
+        
+        for (let ano = 2026; ano <= anoMaximoArq; ano++) {
+            let opt = document.createElement('option');
+            opt.value = ano;
+            opt.innerHTML = ano;
+            const urlParams = new URLSearchParams(window.location.search);
+            const anoPesquisado = urlParams.get('ano');
+            if (anoPesquisado && parseInt(anoPesquisado) === ano) {
+                opt.selected = true;
+            } else if (!anoPesquisado && ano === anoMaximoArq) {
+                opt.selected = true;
+            }
+            selectAnoArq.appendChild(opt);
+        }
+    </script>
 </div>
 
 <div class="card">
