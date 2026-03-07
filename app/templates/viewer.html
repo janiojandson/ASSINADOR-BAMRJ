@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-<div style="display: flex; height: 88vh; gap: 20px;">
+<div class="flex-mobile" style="display: flex; min-height: 88vh; gap: 20px;">
     
     <div id="pdf-viewer" style="flex: 2; background: #525659; overflow-y: auto; padding: 20px; border-radius: 8px;">
         <div id="canvas-container"></div>
@@ -75,7 +75,6 @@
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-    // Montando as URLs na exata mesma ordem do HTML
     const urls = [
         {% for f in doc.files if f.file_type == 'Nota de Empenho' %} "{{ url_for('main.get_pdf', filename=f.filename) }}", {% endfor %}
         {% if role != 'Usuário Comum' %}

@@ -2,45 +2,38 @@
 {% block content %}
 
 <div id="alerta-novo-doc" style="display: none; background: #ffcc00; color: #002244; padding: 12px; text-align: center; font-weight: bold; margin-bottom: 20px; border-radius: 5px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="location.reload()">
-    🔔 Aviso: Houve movimentação na sua Caixa de Entrada. Clique aqui para atualizar a página.
+    🔔 Aviso: Houve movimentação urgente na sua Caixa de Entrada. Clique aqui para atualizar.
 </div>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #002244; color: white; padding: 15px; border-radius: 5px;">
+<div class="flex-mobile" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #002244; color: white; padding: 15px; border-radius: 5px; flex-wrap: wrap; gap: 15px;">
     <div>
         <h3 style="margin: 0;">👤 {{ session.name }} [{{ 'Enc. Finanças' if role == 'Enc_Financas' else role }}]</h3>
         {% if is_substitute %}<span style="background: #ffcc00; color: black; padding: 2px 8px; border-radius: 3px; font-weight: bold; font-size: 0.8em;">MODO SUBSTITUTO ATIVO</span>{% endif %}
     </div>
-    <div style="display: flex; gap: 10px;">
+    <div class="flex-mobile-form" style="display: flex; gap: 10px; width: 100%; justify-content: flex-end;">
         {% if role in ['Chefe_Departamento', 'Vice_Diretor'] %}
-            <a href="{{ url_for('main.toggle_substitute') }}" style="background: #ffcc00; color: black; text-decoration: none; padding: 8px 12px; border-radius: 4px; font-weight: bold;">
+            <a href="{{ url_for('main.toggle_substitute') }}" style="background: #ffcc00; color: black; text-decoration: none; padding: 8px 12px; border-radius: 4px; font-weight: bold; text-align: center;">
                 {% if is_substitute %} ⬅️ Voltar {% else %} ⚡ Substituição Superior {% endif %}
             </a>
         {% endif %}
         
-        <form action="{{ url_for('main.index') }}" method="GET" style="display: flex; gap: 5px;">
+        <form action="{{ url_for('main.index') }}" method="GET" class="flex-mobile-form" style="display: flex; gap: 5px;">
             <select name="ano" id="filtro-ano-dash" style="padding: 8px; border: none; border-radius: 3px; font-weight: bold; color: #002244;"></select>
             <input type="text" name="q" placeholder="Buscar por CNPJ/CPF, Nome..." style="padding: 8px; border: none; width: 250px; border-radius: 3px;">
             <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none; border-radius: 3px; cursor: pointer;">🔍</button>
         </form>
 
         <script>
-            // Gera anos automaticamente a partir de 2026
             const selectAnoDash = document.getElementById('filtro-ano-dash');
             const anoAtualDash = new Date().getFullYear();
-            // Garante que se o relógio do PC estiver atrasado, o 2026 sempre apareça
             const anoMaximoDash = anoAtualDash < 2026 ? 2026 : anoAtualDash;
-            
             for (let ano = 2026; ano <= anoMaximoDash; ano++) {
                 let opt = document.createElement('option');
-                opt.value = ano;
-                opt.innerHTML = ano;
+                opt.value = ano; opt.innerHTML = ano;
                 const urlParams = new URLSearchParams(window.location.search);
                 const anoPesquisado = urlParams.get('ano');
-                if (anoPesquisado && parseInt(anoPesquisado) === ano) {
-                    opt.selected = true;
-                } else if (!anoPesquisado && ano === anoMaximoDash) {
-                    opt.selected = true;
-                }
+                if (anoPesquisado && parseInt(anoPesquisado) === ano) { opt.selected = true; } 
+                else if (!anoPesquisado && ano === anoMaximoDash) { opt.selected = true; }
                 selectAnoDash.appendChild(opt);
             }
         </script>
@@ -50,10 +43,9 @@
 {% if role == 'Admin' %}
 <div class="card" style="border-top: 5px solid #dc3545;">
     <h3>🛡️ Gestão de Usuários</h3>
-    
     <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ddd;">
         <h4 style="margin-top:0">➕ Cadastrar Novo Usuário</h4>
-        <form action="{{ url_for('main.create_user') }}" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <form action="{{ url_for('main.create_user') }}" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap;" class="flex-mobile-form">
             <input type="text" name="name" placeholder="Nome Completo" required style="padding: 8px; flex: 1.5;">
             <input type="text" name="username" placeholder="Usuário (Login)" required style="padding: 8px; flex: 1;">
             <input type="password" name="password" placeholder="Senha Inicial" required style="padding: 8px; flex: 1;">
@@ -69,71 +61,73 @@
             <button type="submit" style="background: #28a745; color: white; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold;">Salvar Usuário</button>
         </form>
     </div>
-
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead><tr style="text-align: left; border-bottom: 2px solid #eee;"><th>Nome</th><th>Usuário</th><th>Perfil</th><th>Ações</th></tr></thead>
-        <tbody>
-            {% for u in users %}
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 10px;">{{ u.name }}</td>
-                <td><b>{{ u.username }}</b></td>
-                <td>
-                    <form action="{{ url_for('main.edit_user') }}" method="POST" style="display: inline;">
-                        <input type="hidden" name="user_id" value="{{ u.id }}">
-                        <select name="role" onchange="this.form.submit()" style="padding: 5px;">
-                            <option value="Admin" {% if u.role == 'Admin' %}selected{% endif %}>Administrador</option>
-                            <option value="Operador" {% if u.role == 'Operador' %}selected{% endif %}>Operador</option>
-                            <option value="Enc_Financas" {% if u.role == 'Enc_Financas' %}selected{% endif %}>Enc. Finanças</option>
-                            <option value="Ajudante_Encarregado" {% if u.role == 'Ajudante_Encarregado' %}selected{% endif %}>Ajudante do Encarregado</option>
-                            <option value="Chefe_Departamento" {% if u.role == 'Chefe_Departamento' %}selected{% endif %}>Chefe Departamento</option>
-                            <option value="Vice_Diretor" {% if u.role == 'Vice_Diretor' %}selected{% endif %}>Vice-Diretor</option>
-                            <option value="Diretor" {% if u.role == 'Diretor' %}selected{% endif %}>Diretor</option>
-                            <option value="Usuário Comum" {% if u.role == 'Usuário Comum' %}selected{% endif %}>Usuário Comum</option>
-                        </select>
-                    </form>
-                </td>
-                <td>{% if u.username != 'admin' %}<a href="{{ url_for('main.delete_user', user_id=u.id) }}" style="color: red; text-decoration: none;" onclick="return confirm('Excluir usuário?')">❌ Excluir</a>{% endif %}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+            <thead><tr style="text-align: left; border-bottom: 2px solid #eee;"><th>Nome</th><th>Usuário</th><th>Perfil</th><th>Ações</th></tr></thead>
+            <tbody>
+                {% for u in users %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">{{ u.name }}</td><td><b>{{ u.username }}</b></td>
+                    <td>
+                        <form action="{{ url_for('main.edit_user') }}" method="POST" style="display: inline;">
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+                            <select name="role" onchange="this.form.submit()" style="padding: 5px;">
+                                <option value="Admin" {% if u.role == 'Admin' %}selected{% endif %}>Administrador</option>
+                                <option value="Operador" {% if u.role == 'Operador' %}selected{% endif %}>Operador</option>
+                                <option value="Enc_Financas" {% if u.role == 'Enc_Financas' %}selected{% endif %}>Enc. Finanças</option>
+                                <option value="Ajudante_Encarregado" {% if u.role == 'Ajudante_Encarregado' %}selected{% endif %}>Ajudante do Encarregado</option>
+                                <option value="Chefe_Departamento" {% if u.role == 'Chefe_Departamento' %}selected{% endif %}>Chefe Departamento</option>
+                                <option value="Vice_Diretor" {% if u.role == 'Vice_Diretor' %}selected{% endif %}>Vice-Diretor</option>
+                                <option value="Diretor" {% if u.role == 'Diretor' %}selected{% endif %}>Diretor</option>
+                                <option value="Usuário Comum" {% if u.role == 'Usuário Comum' %}selected{% endif %}>Usuário Comum</option>
+                            </select>
+                        </form>
+                    </td>
+                    <td>{% if u.username != 'admin' %}<a href="{{ url_for('main.delete_user', user_id=u.id) }}" style="color: red; text-decoration: none;" onclick="return confirm('Excluir usuário?')">❌ Excluir</a>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endif %}
 
 {% if role == 'Operador' %}
-<div style="display: flex; gap: 10px; margin-bottom: 20px;">
+<div class="flex-mobile-form" style="display: flex; gap: 10px; margin-bottom: 20px;">
     <button onclick="document.getElementById('modal').style.display='block'" style="background: #28a745; color: white; padding: 12px 20px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px;">➕ Iniciar Novo Processo</button>
-    <a href="{{ url_for('main.arquivo') }}" style="background: #17a2b8; color: white; padding: 12px 20px; text-decoration: none; cursor: pointer; font-weight: bold; border-radius: 4px;">🗄️ Acessar Arquivo Geral</a>
+    <a href="{{ url_for('main.arquivo') }}" style="background: #17a2b8; color: white; padding: 12px 20px; text-decoration: none; cursor: pointer; font-weight: bold; border-radius: 4px; text-align: center;">🗄️ Acessar Arquivo Geral</a>
 </div>
 
 <div id="modal" class="card" style="display: none; border-left: 10px solid #28a745;">
     <h3>📄 Abertura de Demanda</h3>
     <form action="{{ url_for('main.upload_document') }}" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="protocol" value="{{ pre_protocol }}">
-        <p style="background: #fff3cd; padding: 10px; border-radius: 5px;"><strong>Protocolo Gerado:</strong> {{ pre_protocol }}</p>
+        <p style="background: #fff3cd; padding: 10px; border-radius: 5px; word-break: break-all;"><strong>Protocolo Gerado:</strong> {{ pre_protocol }}</p>
         
-        <input type="text" name="process_name" placeholder="Assunto do Processo" required style="width: 100%; padding: 10px; margin-bottom: 10px;">
-        <input type="text" name="cpf_cnpj" placeholder="CPF ou CNPJ (Somente números)" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+        <input type="text" name="process_name" placeholder="Assunto do Processo" required style="width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box;">
+        <input type="text" name="cpf_cnpj" placeholder="CPF ou CNPJ (Somente números)" style="width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box;">
         
         <label style="display: block; margin-bottom: 15px;"><input type="checkbox" name="priority" value="1"> 🚩 Processo Prioritário</label>
         
-        <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+        <div class="flex-mobile" style="display: flex; gap: 20px; margin-bottom: 15px;">
             <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 5px;">
                 <label><b>Minutas (PDF):</b></label><br>
-                <input type="file" id="m-in" accept="application/pdf" multiple style="margin-top:5px">
-                <ul id="m-list" style="font-size: 0.85em; color: #666; padding-left: 20px;"></ul>
+                <input type="file" id="m-in" accept="application/pdf" multiple style="margin-top:5px; max-width: 100%;">
+                <ul id="m-list" style="font-size: 0.85em; color: #666; padding-left: 20px; word-break: break-all;"></ul>
                 <input type="file" name="minutas" id="m-hidden" multiple style="display: none;">
             </div>
             <div style="flex: 1; background: #f8f9fa; padding: 10px; border-radius: 5px;">
                 <label><b>Anexos (PDF):</b></label><br>
-                <input type="file" id="a-in" accept="application/pdf" multiple style="margin-top:5px">
-                <ul id="a-list" style="font-size: 0.85em; color: #666; padding-left: 20px;"></ul>
+                <input type="file" id="a-in" accept="application/pdf" multiple style="margin-top:5px; max-width: 100%;">
+                <ul id="a-list" style="font-size: 0.85em; color: #666; padding-left: 20px; word-break: break-all;"></ul>
                 <input type="file" name="anexos" id="a-hidden" multiple style="display: none;">
             </div>
         </div>
-        <textarea name="observation" placeholder="Observações iniciais..." style="width: 100%; height: 60px; margin-bottom: 10px; padding: 5px;"></textarea>
-        <button type="submit" style="background: #003366; color: white; padding: 10px 25px; border: none; cursor: pointer; font-weight: bold;">Gerar e Tramitar</button>
-        <button type="button" onclick="location.reload()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; cursor: pointer;">Cancelar</button>
+        <textarea name="observation" placeholder="Observações iniciais..." style="width: 100%; height: 60px; margin-bottom: 10px; padding: 5px; box-sizing: border-box;"></textarea>
+        <div class="flex-mobile-form" style="display: flex; gap: 10px;">
+            <button type="submit" style="background: #003366; color: white; padding: 10px 25px; border: none; cursor: pointer; font-weight: bold; flex: 2;">Gerar e Tramitar</button>
+            <button type="button" onclick="location.reload()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; cursor: pointer; flex: 1;">Cancelar</button>
+        </div>
     </form>
 </div>
 
@@ -141,10 +135,7 @@
     const dtM = new DataTransfer(), dtA = new DataTransfer();
     function setup(inId, hidId, listId, dt) {
         const inp = document.getElementById(inId), hid = document.getElementById(hidId), list = document.getElementById(listId);
-        inp.addEventListener('change', () => {
-            for(let f of inp.files) dt.items.add(f);
-            render();
-        });
+        inp.addEventListener('change', () => { for(let f of inp.files) dt.items.add(f); render(); });
         function render() {
             list.innerHTML = ''; hid.files = dt.files;
             Array.from(dt.files).forEach((f, i) => {
@@ -154,14 +145,11 @@
             });
         }
         window.rem = (i, lId) => { 
-            const activeDt = (lId === 'm-list') ? dtM : dtA;
-            activeDt.items.remove(i); 
-            (lId === 'm-list') ? setup('m-in', 'm-hidden', 'm-list', dtM).render() : setup('a-in', 'a-hidden', 'a-list', dtA).render();
-            location.reload(); 
+            const activeDt = (lId === 'm-list') ? dtM : dtA; activeDt.items.remove(i); 
+            (lId === 'm-list') ? setup('m-in', 'm-hidden', 'm-list', dtM).render() : setup('a-in', 'a-hidden', 'a-list', dtA).render(); location.reload(); 
         };
     }
-    setup('m-in', 'm-hidden', 'm-list', dtM);
-    setup('a-in', 'a-hidden', 'a-list', dtA);
+    setup('m-in', 'm-hidden', 'm-list', dtM); setup('a-in', 'a-hidden', 'a-list', dtA);
 </script>
 {% endif %}
 
@@ -170,52 +158,84 @@
         <h3 style="text-align: center; color: #666;">Utilize a barra de pesquisa acima para buscar Notas de Empenho por CPF/CNPJ.</h3>
     {% else %}
         <h3>📂 Processos Encontrados/Na Caixa</h3>
-        <table style="width: 100%; border-collapse: collapse;">
-            <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd;"><th>Prior.</th><th>Protocolo</th><th>Assunto</th><th>CPF/CNPJ</th><th>Status</th><th>Ações</th></tr>
-            {% for doc in documents %}
-            <tr style="border-bottom: 1px solid #eee; {% if doc.is_priority %} background: #fff5f5; {% endif %}">
-                <td style="padding: 10px; text-align: center;">{{ '🚩' if doc.is_priority else '🏳️' }}</td>
-                <td style="padding: 10px;"><code>{{ doc.protocol }}</code></td>
-                <td style="padding: 10px;">{{ doc.name }}</td>
-                <td style="padding: 10px;">{{ doc.cpf_cnpj or '-' }}</td>
-                <td style="padding: 10px;"><span style="font-size: 0.8em; background: #e2e3e5; padding: 3px 7px; border-radius: 4px;">{{ doc.status }}</span></td>
-                <td style="padding: 10px; display: flex; gap: 5px; align-items: center;">
-                    <a href="{{ url_for('main.view_process', doc_id=doc.id) }}" style="background: #003366; color: white; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em;">Abrir</a>
-                    
-                    {% if role == 'Operador' %}
-                        <form action="{{ url_for('main.cancel_document', doc_id=doc.id) }}" method="POST" onsubmit="return confirm('Deseja realmente cancelar este processo?');" style="margin: 0;">
-                            <button type="submit" style="background: #dc3545; color: white; padding: 5px 12px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.9em; font-weight: bold;">Cancelar</button>
-                        </form>
+        <div class="table-responsive">
+            <table style="width: 100%; border-collapse: collapse; min-width: 800px;">
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; text-align: left;">
+                    <th style="padding: 10px;">Prior.</th><th style="padding: 10px;">Protocolo</th><th style="padding: 10px;">Assunto</th><th style="padding: 10px;">CPF/CNPJ</th><th style="padding: 10px;">Status</th><th style="padding: 10px;">Ações</th>
+                </tr>
+                {% for doc in documents %}
+                <tr style="border-bottom: 1px solid #eee; {% if doc.is_priority %} background: #fff5f5; {% endif %}">
+                    <td style="padding: 10px; text-align: center;">{{ '🚩' if doc.is_priority else '🏳️' }}</td>
+                    <td style="padding: 10px;"><code>{{ doc.protocol }}</code></td>
+                    <td style="padding: 10px;">{{ doc.name }}</td>
+                    <td style="padding: 10px;">{{ doc.cpf_cnpj or '-' }}</td>
+                    <td style="padding: 10px;">
+                        <span style="font-size: 0.85em; padding: 4px 8px; border-radius: 4px; font-weight: bold;
+                            {% if doc.status == 'Devolvido - Operador' %} background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;
+                            {% elif doc.status == 'Aguardando Empenho - Operador' %} background: #d4edda; color: #155724; border: 1px solid #c3e6cb;
+                            {% else %} background: #e2e3e5; color: #383d41; {% endif %}">
+                            {{ doc.status }}
+                        </span>
+                    </td>
+                    <td class="mobile-action-buttons" style="padding: 10px; display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+                        <a href="{{ url_for('main.view_process', doc_id=doc.id) }}" style="background: #003366; color: white; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em;">Abrir</a>
                         
-                        {% if doc.status == 'Aguardando Empenho - Operador' %}
-                            <form action="{{ url_for('main.upload_ne', doc_id=doc.id) }}" method="POST" enctype="multipart/form-data" style="margin: 0; display: flex; gap: 5px;">
-                                <input type="file" name="nota_empenho" required accept="application/pdf" style="width: 180px; padding: 2px;">
-                                <button type="submit" style="background: #28a745; color: white; padding: 5px 12px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.9em; font-weight: bold;">Anexar NE</button>
+                        {% if role == 'Operador' %}
+                            {% if doc.status == 'Devolvido - Operador' %}
+                                <a href="{{ url_for('main.edit_process', doc_id=doc.id) }}" style="background: #ffcc00; color: #002244; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em;">✏️ Editar</a>
+                            {% endif %}
+
+                            <form action="{{ url_for('main.cancel_document', doc_id=doc.id) }}" method="POST" onsubmit="return confirm('Deseja realmente cancelar este processo?');" style="margin: 0;">
+                                <button type="submit" style="background: #dc3545; color: white; padding: 5px 12px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.9em; font-weight: bold;">Cancelar</button>
                             </form>
+                            
+                            {% if doc.status == 'Aguardando Empenho - Operador' %}
+                                <form action="{{ url_for('main.upload_ne', doc_id=doc.id) }}" method="POST" enctype="multipart/form-data" class="flex-mobile-form" style="margin: 0; display: flex; gap: 5px;">
+                                    <input type="file" name="nota_empenho" required accept="application/pdf" style="width: 180px; padding: 2px;">
+                                    <button type="submit" style="background: #28a745; color: white; padding: 5px 12px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.9em; font-weight: bold;">Anexar NE</button>
+                                </form>
+                            {% endif %}
                         {% endif %}
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
     {% endif %}
 </div>
 
-{% if role not in ['Admin', 'Usuário Comum'] and not request.args.get('q') %}
+{% if role == 'Operador' or role not in ['Admin', 'Usuário Comum'] %}
 <script>
-    let contagemAtual = {{ inbox_count | default(0) }};
+    // Usa sessionStorage para persistir a contagem mesmo se o usuário navegar entre abas
+    let contagemInicial = {{ inbox_count | default(0) }};
+    if (!sessionStorage.getItem('ultimaContagem')) {
+        sessionStorage.setItem('ultimaContagem', contagemInicial);
+    }
 
     setInterval(function() {
         fetch('/api/check_inbox')
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if (data.count > contagemAtual) {
-                    document.getElementById('alerta-novo-doc').style.display = 'block';
+                let ultimaConhecida = parseInt(sessionStorage.getItem('ultimaContagem'));
+                
+                // Se a contagem no banco for maior que a última conhecida, alerta o usuário
+                if (data.count > ultimaConhecida) {
+                    const banner = document.getElementById('alerta-novo-doc');
+                    banner.style.display = 'block';
+                    banner.style.animation = "pulse 2s infinite";
                 }
             })
-            .catch(error => console.error('Erro no Polling:', error));
+            .catch(e => console.error('Erro Polling:', e));
     }, 60000); // 60 segundos
 </script>
+
+<style>
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.02); background-color: #ffeb3b; }
+        100% { transform: scale(1); }
+    }
+</style>
 {% endif %}
 
 {% endblock %}
