@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
 
+<div id="alerta-novo-doc" style="display: none; background: #ffcc00; color: #002244; padding: 12px; text-align: center; font-weight: bold; margin-bottom: 20px; border-radius: 5px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="location.reload()">
+    🔔 Aviso: Houve movimentação na sua Caixa de Entrada. Clique aqui para atualizar a página.
+</div>
+
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #002244; color: white; padding: 15px; border-radius: 5px;">
     <div>
         <h3 style="margin: 0;">👤 {{ session.name }} [{{ 'Enc. Finanças' if role == 'Enc_Financas' else role }}]</h3>
@@ -12,9 +16,15 @@
                 {% if is_substitute %} ⬅️ Voltar {% else %} ⚡ Substituição Superior {% endif %}
             </a>
         {% endif %}
-        <form action="{{ url_for('main.index') }}" method="GET" style="display: flex;">
-            <input type="text" name="q" placeholder="Buscar por CNPJ/CPF, Nome..." style="padding: 8px; border: none; width: 250px;">
-            <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none;">🔍</button>
+        
+        <form action="{{ url_for('main.index') }}" method="GET" style="display: flex; gap: 5px;">
+            <select name="ano" style="padding: 8px; border: none; border-radius: 3px;">
+                <option value="2026" selected>2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+            </select>
+            <input type="text" name="q" placeholder="Buscar por CNPJ/CPF, Nome..." style="padding: 8px; border: none; width: 250px; border-radius: 3px;">
+            <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none; border-radius: 3px; cursor: pointer;">🔍</button>
         </form>
     </div>
 </div>
@@ -172,4 +182,22 @@
         </table>
     {% endif %}
 </div>
+
+{% if role not in ['Admin', 'Usuário Comum'] and not request.args.get('q') %}
+<script>
+    let contagemAtual = {{ inbox_count | default(0) }};
+
+    setInterval(function() {
+        fetch('/api/check_inbox')
+            .then(response => response.json())
+            .then(data => {
+                if (data.count > contagemAtual) {
+                    document.getElementById('alerta-novo-doc').style.display = 'block';
+                }
+            })
+            .catch(error => console.error('Erro no Polling:', error));
+    }, 60000); // 60 segundos
+</script>
+{% endif %}
+
 {% endblock %}

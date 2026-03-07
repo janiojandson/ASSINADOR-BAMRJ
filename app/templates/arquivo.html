@@ -6,9 +6,15 @@
         <h3 style="margin: 0;">🗄️ Arquivo Geral de Processos</h3>
         <p style="margin: 5px 0 0 0; font-size: 0.85em; color: #ccc;">Consulta de processos finalizados e cancelados.</p>
     </div>
-    <form action="{{ url_for('main.arquivo') }}" method="GET" style="display: flex;">
-        <input type="text" name="q" placeholder="Buscar no arquivo (Nome, CNPJ...)" style="padding: 8px; border: none; width: 280px;">
-        <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none;">🔍</button>
+    
+    <form action="{{ url_for('main.arquivo') }}" method="GET" style="display: flex; gap: 5px;">
+        <select name="ano" style="padding: 8px; border: none; border-radius: 3px;">
+            <option value="2026" selected>2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+        </select>
+        <input type="text" name="q" placeholder="Buscar no arquivo (Nome, CNPJ...)" style="padding: 8px; border: none; width: 280px; border-radius: 3px;">
+        <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none; border-radius: 3px; cursor: pointer;">🔍</button>
     </form>
 </div>
 

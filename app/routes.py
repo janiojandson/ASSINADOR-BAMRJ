@@ -1,7 +1,8 @@
-import os, uuid
+import os, uuid, re
 from datetime import datetime
-from flask import Blueprint, request, redirect, url_for, session, render_template, current_app, send_from_directory
+from flask import Blueprint, request, redirect, url_for, session, render_template, current_app, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
+from sqlalchemy import extract
 from app import db
 from app.models import User, Document, Event, DocumentFile
 
@@ -12,17 +13,23 @@ def index():
     if 'user_id' not in session: return redirect(url_for('main.login'))
     
     role = session.get('role'); username = session.get('username')
-    is_sub = session.get('is_substitute', False); search_query = request.args.get('q', '')
+    is_sub = session.get('is_substitute', False)
+    
+    # Tratamento da Pesquisa
+    search_query = request.args.get('q', '')
+    search_query_clean = re.sub(r'\D', '', search_query) if search_query else ''
+    ano_filtro = request.args.get('ano', str(datetime.now().year))
 
     if role == 'Admin':
         return render_template('dashboard.html', users=User.query.all(), role=role)
 
-    # Pesquisa
+    # Pesquisa com Filtro de Ano e CPF/CNPJ Limpo
     if search_query:
+        base_query = Document.query.filter(extract('year', Document.created_at) == int(ano_filtro))
         if role == 'Usuário Comum':
-            documents = Document.query.filter((Document.cpf_cnpj.ilike(f'%{search_query}%')) & (Document.status == 'Arquivado')).all()
+            documents = base_query.filter((Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) & (Document.status == 'Arquivado')).all()
         else:
-            documents = Document.query.filter((Document.name.ilike(f'%{search_query}%')) | (Document.protocol.ilike(f'%{search_query}%')) | (Document.cpf_cnpj.ilike(f'%{search_query}%'))).all()
+            documents = base_query.filter((Document.name.ilike(f'%{search_query}%')) | (Document.protocol.ilike(f'%{search_query}%')) | (Document.cpf_cnpj.ilike(f'%{search_query_clean}%'))).all()
         return render_template('dashboard.html', documents=documents, role=role, is_substitute=is_sub)
 
     # Caixas de Entrada
@@ -30,7 +37,7 @@ def index():
     if role == 'Operador':
         documents = Document.query.filter(Document.status.notin_(['Arquivado', 'Cancelado'])).order_by(Document.is_priority.desc(), Document.created_at.desc()).all()
         date_str = datetime.now().strftime('%Y%m%d')
-        return render_template('dashboard.html', documents=documents, role=role, pre_protocol=f"BAMRJ-{date_str}-{str(uuid.uuid4())[:4].upper()}")
+        return render_template('dashboard.html', documents=documents, role=role, pre_protocol=f"BAMRJ-{date_str}-{str(uuid.uuid4())[:4].upper()}", inbox_count=len(documents))
         
     elif role == 'Usuário Comum':
         return render_template('dashboard.html', documents=[], role=role)
@@ -103,9 +110,13 @@ def upload_document():
     caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_atual, nome_seguro)
     os.makedirs(caminho_processo, exist_ok=True)
 
+    # Limpeza Automática do CPF/CNPJ
+    cpf_cnpj_raw = request.form.get('cpf_cnpj', '')
+    cpf_cnpj_clean = re.sub(r'\D', '', cpf_cnpj_raw)
+
     novo_doc = Document(
         protocol=request.form.get('protocol'), name=request.form.get('process_name'),
-        cpf_cnpj=request.form.get('cpf_cnpj'), is_priority=True if request.form.get('priority') else False,
+        cpf_cnpj=cpf_cnpj_clean, is_priority=True if request.form.get('priority') else False,
         current_observation=f"[Início] {request.form.get('observation')}",
         uploader_name=session.get('username'), status='Caixa de Entrada - Enc. Finanças'
     )
@@ -132,12 +143,24 @@ def process_action(doc_id, action):
         cargo = f"{role} (SUBSTITUTO)" if is_sub else ('Enc. Finanças' if role == 'Enc_Financas' else role)
         doc.current_observation += f"\n[{datetime.now().strftime('%d/%m %H:%M')} - {cargo}]: {obs}"
         
-    if action == 'rejeitar': doc.status = 'Devolvido - Operador'
+    if action == 'rejeitar': 
+        doc.status = 'Devolvido - Operador'
     elif action == 'aprovar':
-        if doc.status == 'Caixa de Entrada - Enc. Finanças': doc.status = 'Caixa de Entrada - Chefe'
-        elif doc.status == 'Caixa de Entrada - Chefe': doc.status = 'Caixa de Entrada - Vice-Diretor'
-        elif doc.status == 'Caixa de Entrada - Vice-Diretor': doc.status = 'Caixa de Entrada - Diretor'
-        elif doc.status == 'Caixa de Entrada - Diretor' or (is_sub and role == 'Vice_Diretor'): doc.status = 'Aguardando Empenho - Operador'
+        if doc.status == 'Caixa de Entrada - Enc. Finanças':
+            doc.status = 'Caixa de Entrada - Chefe'
+        elif doc.status == 'Caixa de Entrada - Chefe':
+            if is_sub and role == 'Chefe_Departamento':
+                doc.status = 'Caixa de Entrada - Diretor'
+            else:
+                doc.status = 'Caixa de Entrada - Vice-Diretor'
+        elif doc.status == 'Caixa de Entrada - Vice-Diretor':
+            if is_sub and role == 'Vice_Diretor':
+                doc.status = 'Aguardando Empenho - Operador'
+            else:
+                doc.status = 'Caixa de Entrada - Diretor'
+        elif doc.status == 'Caixa de Entrada - Diretor':
+            doc.status = 'Aguardando Empenho - Operador'
+            
     db.session.commit(); return redirect(url_for('main.index'))
 
 @main.route('/cancel_document/<int:doc_id>', methods=['POST'])
@@ -175,20 +198,47 @@ def arquivo():
     
     role = session.get('role')
     search_query = request.args.get('q', '')
+    search_query_clean = re.sub(r'\D', '', search_query) if search_query else ''
+    ano_filtro = request.args.get('ano', str(datetime.now().year))
     
-    # Busca apenas processos Arquivados ou Cancelados
-    query = Document.query.filter(Document.status.in_(['Arquivado', 'Cancelado']))
+    query = Document.query.filter(Document.status.in_(['Arquivado', 'Cancelado'])).filter(extract('year', Document.created_at) == int(ano_filtro))
     
     if search_query:
         query = query.filter(
             (Document.name.ilike(f'%{search_query}%')) | 
             (Document.protocol.ilike(f'%{search_query}%')) | 
-            (Document.cpf_cnpj.ilike(f'%{search_query}%'))
+            (Document.cpf_cnpj.ilike(f'%{search_query_clean}%'))
         )
         
     documents = query.order_by(Document.created_at.desc()).all()
-    
     return render_template('arquivo.html', documents=documents, role=role)
 
 @main.route('/get_pdf/<path:filename>')
 def get_pdf(filename): return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+
+# NOVA ROTA: API Silenciosa de Polling
+@main.route('/api/check_inbox')
+def check_inbox():
+    if 'user_id' not in session: return jsonify({'count': 0})
+    
+    role = session.get('role')
+    is_sub = session.get('is_substitute', False)
+    inbox_statuses = []
+    
+    if role in ['Enc_Financas', 'Ajudante_Encarregado']: inbox_statuses = ['Caixa de Entrada - Enc. Finanças']
+    elif role == 'Chefe_Departamento':
+        inbox_statuses = ['Caixa de Entrada - Chefe']
+        if is_sub: inbox_statuses.append('Caixa de Entrada - Vice-Diretor')
+    elif role == 'Vice_Diretor':
+        inbox_statuses = ['Caixa de Entrada - Vice-Diretor']
+        if is_sub: inbox_statuses.append('Caixa de Entrada - Diretor')
+    elif role == 'Diretor':
+        inbox_statuses = ['Caixa de Entrada - Diretor']
+    elif role == 'Operador':
+        count = Document.query.filter(Document.status.notin_(['Arquivado', 'Cancelado'])).count()
+        return jsonify({'count': count})
+    else:
+        return jsonify({'count': 0}) # Admin e Usuário comum
+        
+    count = Document.query.filter(Document.status.in_(inbox_statuses)).count()
+    return jsonify({'count': count})
