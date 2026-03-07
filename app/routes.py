@@ -132,12 +132,30 @@ def process_action(doc_id, action):
         cargo = f"{role} (SUBSTITUTO)" if is_sub else ('Enc. Finanças' if role == 'Enc_Financas' else role)
         doc.current_observation += f"\n[{datetime.now().strftime('%d/%m %H:%M')} - {cargo}]: {obs}"
         
-    if action == 'rejeitar': doc.status = 'Devolvido - Operador'
+    if action == 'rejeitar': 
+        doc.status = 'Devolvido - Operador'
     elif action == 'aprovar':
-        if doc.status == 'Caixa de Entrada - Enc. Finanças': doc.status = 'Caixa de Entrada - Chefe'
-        elif doc.status == 'Caixa de Entrada - Chefe': doc.status = 'Caixa de Entrada - Vice-Diretor'
-        elif doc.status == 'Caixa de Entrada - Vice-Diretor': doc.status = 'Caixa de Entrada - Diretor'
-        elif doc.status == 'Caixa de Entrada - Diretor' or (is_sub and role == 'Vice_Diretor'): doc.status = 'Aguardando Empenho - Operador'
+        # LÓGICA DE TRAMITAÇÃO AJUSTADA COM PULO DE ETAPAS PARA SUBSTITUTOS
+        if doc.status == 'Caixa de Entrada - Enc. Finanças':
+            doc.status = 'Caixa de Entrada - Chefe'
+            
+        elif doc.status == 'Caixa de Entrada - Chefe':
+            # Se o Chefe está substituindo o Vice-Diretor, pula para o Diretor
+            if is_sub and role == 'Chefe_Departamento':
+                doc.status = 'Caixa de Entrada - Diretor'
+            else:
+                doc.status = 'Caixa de Entrada - Vice-Diretor'
+                
+        elif doc.status == 'Caixa de Entrada - Vice-Diretor':
+            # Se o Vice-Diretor está substituindo o Diretor, pula direto para Empenho
+            if is_sub and role == 'Vice_Diretor':
+                doc.status = 'Aguardando Empenho - Operador'
+            else:
+                doc.status = 'Caixa de Entrada - Diretor'
+                
+        elif doc.status == 'Caixa de Entrada - Diretor':
+            doc.status = 'Aguardando Empenho - Operador'
+            
     db.session.commit(); return redirect(url_for('main.index'))
 
 @main.route('/cancel_document/<int:doc_id>', methods=['POST'])
