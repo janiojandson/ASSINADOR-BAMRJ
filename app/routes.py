@@ -33,7 +33,7 @@ def index():
     if role == 'Operador':
         documents = Document.query.filter(Document.status.notin_(['Arquivado', 'Cancelado'])).order_by(Document.is_priority.desc(), Document.created_at.desc()).all()
         date_str = datetime.now().strftime('%Y%m%d')
-        # LÓGICA DE AVISO: Operador só é avisado de Devolvidos ou Aguardando Empenho
+        # Lógica de contagem para o Polling (Devolvidos + Aguardando Empenho)
         inbox_count = sum(1 for d in documents if d.status in ['Devolvido - Operador', 'Aguardando Empenho - Operador'])
         return render_template('dashboard.html', documents=documents, role=role, pre_protocol=f"BAMRJ-{date_str}-{str(uuid.uuid4())[:4].upper()}", inbox_count=inbox_count)
         
@@ -100,14 +100,19 @@ def toggle_substitute():
 @main.route('/upload', methods=['POST'])
 def upload_document():
     if session.get('role') != 'Operador': return "Acesso Negado", 403
-    ano_atual = str(datetime.now().year); nome_seguro = secure_filename(request.form.get('process_name'))
-    caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_atual, nome_seguro)
+    
+    protocolo = request.form.get('protocol')
+    ano_atual = str(datetime.now().year)
+    
+    # MUDANÇA TÁTICA: Pasta agora usa o PROTOCOLO para evitar perda de arquivos em edições de assunto
+    caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_atual, protocolo)
     os.makedirs(caminho_processo, exist_ok=True)
+    
     cpf_cnpj_raw = request.form.get('cpf_cnpj', '')
     cpf_cnpj_clean = re.sub(r'\D', '', cpf_cnpj_raw)
 
     novo_doc = Document(
-        protocol=request.form.get('protocol'), name=request.form.get('process_name'),
+        protocol=protocolo, name=request.form.get('process_name'),
         cpf_cnpj=cpf_cnpj_clean, is_priority=True if request.form.get('priority') else False,
         current_observation=f"[Início] {request.form.get('observation')}",
         uploader_name=session.get('username'), status='Caixa de Entrada - Enc. Finanças'
@@ -116,15 +121,18 @@ def upload_document():
 
     for f in request.files.getlist('minutas'):
         if f and f.filename:
-            fname = secure_filename(f.filename); f.save(os.path.join(caminho_processo, fname))
-            db.session.add(DocumentFile(document_id=novo_doc.id, filename=os.path.join(ano_atual, nome_seguro, fname).replace('\\', '/'), file_type='Minuta'))
+            fname = secure_filename(f.filename)
+            f.save(os.path.join(caminho_processo, fname))
+            db.session.add(DocumentFile(document_id=novo_doc.id, filename=f"{ano_atual}/{protocolo}/{fname}", file_type='Minuta'))
+            
     for f in request.files.getlist('anexos'):
         if f and f.filename:
-            fname = secure_filename(f.filename); f.save(os.path.join(caminho_processo, fname))
-            db.session.add(DocumentFile(document_id=novo_doc.id, filename=os.path.join(ano_atual, nome_seguro, fname).replace('\\', '/'), file_type='Anexo'))
+            fname = secure_filename(f.filename)
+            f.save(os.path.join(caminho_processo, fname))
+            db.session.add(DocumentFile(document_id=novo_doc.id, filename=f"{ano_atual}/{protocolo}/{fname}", file_type='Anexo'))
+            
     db.session.commit(); return redirect(url_for('main.index'))
 
-# --- ROTAS DE EDIÇÃO PARA OPERADOR ---
 @main.route('/edit/<int:doc_id>')
 def edit_process(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
@@ -137,23 +145,29 @@ def update_process(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     doc = Document.query.get_or_404(doc_id)
     
+    # Atualiza dados sem quebrar o caminho físico
     doc.name = request.form.get('process_name')
     doc.cpf_cnpj = re.sub(r'\D', '', request.form.get('cpf_cnpj', ''))
     doc.is_priority = True if request.form.get('priority') else False
     
-    ano_atual = str(doc.created_at.year)
-    nome_seguro = secure_filename(doc.name)
-    caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_atual, nome_seguro)
+    # Recupera a pasta original baseada no Protocolo e Ano de criação
+    ano_doc = str(doc.created_at.year)
+    protocolo = doc.protocol
+    caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_doc, protocolo)
     os.makedirs(caminho_processo, exist_ok=True)
     
+    # Adiciona novos arquivos mantendo os antigos
     for f in request.files.getlist('minutas'):
         if f and f.filename:
-            fname = secure_filename(f.filename); f.save(os.path.join(caminho_processo, fname))
-            db.session.add(DocumentFile(document_id=doc.id, filename=os.path.join(ano_atual, nome_seguro, fname).replace('\\', '/'), file_type='Minuta'))
+            fname = secure_filename(f.filename)
+            f.save(os.path.join(caminho_processo, fname))
+            db.session.add(DocumentFile(document_id=doc.id, filename=f"{ano_doc}/{protocolo}/{fname}", file_type='Minuta'))
+            
     for f in request.files.getlist('anexos'):
         if f and f.filename:
-            fname = secure_filename(f.filename); f.save(os.path.join(caminho_processo, fname))
-            db.session.add(DocumentFile(document_id=doc.id, filename=os.path.join(ano_atual, nome_seguro, fname).replace('\\', '/'), file_type='Anexo'))
+            fname = secure_filename(f.filename)
+            f.save(os.path.join(caminho_processo, fname))
+            db.session.add(DocumentFile(document_id=doc.id, filename=f"{ano_doc}/{protocolo}/{fname}", file_type='Anexo'))
             
     obs = request.form.get('observation')
     doc.status = 'Caixa de Entrada - Enc. Finanças'
@@ -167,10 +181,10 @@ def delete_file(file_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     f = DocumentFile.query.get_or_404(file_id)
     doc_id = f.document_id
+    # Remove do banco; o arquivo físico permanece por segurança (doutrina militar)
     db.session.delete(f)
     db.session.commit()
     return redirect(url_for('main.edit_process', doc_id=doc_id))
-# -------------------------------------------
 
 @main.route('/process_action/<int:doc_id>/<action>', methods=['POST'])
 def process_action(doc_id, action):
@@ -211,11 +225,13 @@ def upload_ne(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     doc = Document.query.get_or_404(doc_id); arquivo_ne = request.files.get('nota_empenho')
     if arquivo_ne and arquivo_ne.filename:
-        ano_atual = str(datetime.now().year); nome_seguro = secure_filename(doc.name)
-        caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_atual, nome_seguro)
+        ano_atual = str(datetime.now().year)
+        protocolo = doc.protocol
+        caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_atual, protocolo)
         os.makedirs(caminho_processo, exist_ok=True)
-        fname = secure_filename(arquivo_ne.filename); arquivo_ne.save(os.path.join(caminho_processo, fname))
-        db.session.add(DocumentFile(document_id=doc.id, filename=os.path.join(ano_atual, nome_seguro, fname).replace('\\', '/'), file_type='Nota de Empenho'))
+        fname = secure_filename(arquivo_ne.filename)
+        arquivo_ne.save(os.path.join(caminho_processo, fname))
+        db.session.add(DocumentFile(document_id=doc.id, filename=f"{ano_atual}/{protocolo}/{fname}", file_type='Nota de Empenho'))
         doc.status = 'Arquivado'
         db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='ANEXAR_NE', observation='Nota de Empenho anexada.'))
         db.session.commit()
@@ -256,7 +272,7 @@ def check_inbox():
         if is_sub: inbox_statuses.append('Caixa de Entrada - Diretor')
     elif role == 'Diretor': inbox_statuses = ['Caixa de Entrada - Diretor']
     elif role == 'Operador':
-        # POLING: API SÓ AVISA SE CHEGAR DEVOLVIDO OU EMPENHO
+        # Conta Devolvidos e Aguardando Empenho para o Polling
         count = Document.query.filter(Document.status.in_(['Devolvido - Operador', 'Aguardando Empenho - Operador'])).count()
         return jsonify({'count': count})
     else: return jsonify({'count': 0}) 

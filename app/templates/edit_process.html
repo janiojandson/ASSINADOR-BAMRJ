@@ -5,53 +5,82 @@
     
     <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
         <strong>⚠️ Motivo da Devolução / Histórico:</strong><br>
-        <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; margin-top: 10px; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 3px;">{{ doc.current_observation }}</div>
+        <div style="white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: 0.9em; margin-top: 10px; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.05);">{{ doc.current_observation }}</div>
     </div>
 
     <form action="{{ url_for('main.update_process', doc_id=doc.id) }}" method="POST" enctype="multipart/form-data">
-        <label style="font-weight: bold;">Assunto do Processo:</label>
-        <input type="text" name="process_name" value="{{ doc.name }}" required style="width: 100%; padding: 10px; margin-bottom: 15px; box-sizing: border-box;">
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold; color: #002244;">Assunto do Processo:</label>
+            <input type="text" name="process_name" value="{{ doc.name }}" required style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
         
-        <label style="font-weight: bold;">CPF ou CNPJ:</label>
-        <input type="text" name="cpf_cnpj" value="{{ doc.cpf_cnpj }}" style="width: 100%; padding: 10px; margin-bottom: 15px; box-sizing: border-box;">
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold; color: #002244;">CPF ou CNPJ:</label>
+            <input type="text" name="cpf_cnpj" value="{{ doc.cpf_cnpj }}" placeholder="Apenas números" style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
         
-        <label style="display: block; margin-bottom: 20px; font-weight: bold; background: #fff3cd; padding: 10px; border-radius: 4px;">
-            <input type="checkbox" name="priority" value="1" {% if doc.is_priority %}checked{% endif %}> 🚩 Marcar como Processo Prioritário
+        <label style="display: block; margin-bottom: 20px; font-weight: bold; background: #fff3cd; padding: 12px; border-radius: 4px; border: 1px solid #ffeeba; cursor: pointer;">
+            <input type="checkbox" name="priority" value="1" {% if doc.is_priority %}checked{% endif %}> 🚩 Processo Prioritário
         </label>
 
-        <div style="background: #f1f3f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ddd;">
-            <h4 style="margin-top: 0;">📂 Arquivos Atuais (Para excluir, clique no botão vermelho)</h4>
-            <ul style="list-style: none; padding: 0; margin: 0;">
+        <div style="background: #f1f3f5; padding: 15px; border-radius: 5px; margin-bottom: 25px; border: 1px solid #ddd;">
+            <h4 style="margin-top: 0; color: #002244; border-bottom: 1px solid #ccc; padding-bottom: 8px;">📂 Arquivos Atuais (Ação Irreversível)</h4>
+            <ul style="list-style: none; padding: 0; margin: 10px 0 0 0;">
                 {% for f in doc.files %}
-                <li style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                    <span style="font-size: 0.9em;"><b>[{{ f.file_type }}]</b> {{ f.filename.split('/')[-1] }}</span>
-                    <button type="button" onclick="if(confirm('Tem certeza que deseja excluir este arquivo permanentemente?')) { document.getElementById('del-form-{{f.id}}').submit(); }" style="background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 5px 10px; font-weight: bold; font-size: 0.8em;">❌ Excluir</button>
+                <li style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; gap: 10px;" class="flex-mobile">
+                    <span style="font-size: 0.85em; color: #444; word-break: break-all;">
+                        <i class="fas fa-file-pdf" style="color: #dc3545;"></i> 
+                        <strong>[{{ f.file_type }}]</strong> {{ f.filename.split('/')[-1] }}
+                    </span>
+                    <button type="button" onclick="if(confirm('Deseja excluir este arquivo permanentemente do servidor?')) { document.getElementById('del-form-{{f.id}}').submit(); }" 
+                            style="background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 6px 12px; font-weight: bold; font-size: 0.75em; white-space: nowrap;">
+                        <i class="fas fa-trash-alt"></i> Excluir
+                    </button>
                 </li>
                 {% endfor %}
             </ul>
+            {% if not doc.files %}
+                <p style="font-size: 0.9em; color: #666; font-style: italic;">Nenhum arquivo anexado a este processo.</p>
+            {% endif %}
         </div>
         
-        <h4 style="margin-bottom: 10px;">➕ Adicionar Novos Arquivos</h4>
-        <div style="display: flex; gap: 15px; margin-bottom: 20px;" class="flex-mobile">
-            <div style="flex: 1; background: #e9ecef; padding: 15px; border-radius: 5px;">
-                <label><b>Novas Minutas (PDF):</b></label><br>
-                <input type="file" name="minutas" accept="application/pdf" multiple style="margin-top:5px; width: 100%;">
+        <h4 style="margin-bottom: 10px; color: #002244;">➕ Adicionar Novos Documentos</h4>
+        <div style="display: flex; gap: 15px; margin-bottom: 25px;" class="flex-mobile">
+            <div style="flex: 1; background: #e9ecef; padding: 15px; border-radius: 5px; border: 1px dashed #adb5bd;">
+                <label style="font-size: 0.9em;"><strong>Novas Minutas (PDF):</strong></label><br>
+                <input type="file" name="minutas" accept="application/pdf" multiple style="margin-top:8px; width: 100%; font-size: 0.8em;">
             </div>
-            <div style="flex: 1; background: #e9ecef; padding: 15px; border-radius: 5px;">
-                <label><b>Novos Anexos (PDF):</b></label><br>
-                <input type="file" name="anexos" accept="application/pdf" multiple style="margin-top:5px; width: 100%;">
+            <div style="flex: 1; background: #e9ecef; padding: 15px; border-radius: 5px; border: 1px dashed #adb5bd;">
+                <label style="font-size: 0.9em;"><strong>Novos Anexos (PDF):</strong></label><br>
+                <input type="file" name="anexos" accept="application/pdf" multiple style="margin-top:8px; width: 100%; font-size: 0.8em;">
             </div>
         </div>
 
-        <label style="font-weight: bold;">Observação do Retorno / Correção:</label>
-        <textarea name="observation" placeholder="Descreva o que foi corrigido para a chefia..." required style="width: 100%; height: 80px; margin-bottom: 15px; padding: 10px; box-sizing: border-box;"></textarea>
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: bold; color: #002244;">Observação do Retorno / Correção:</label>
+            <textarea name="observation" placeholder="Descreva as alterações realizadas para ciência da chefia..." required style="width: 100%; height: 100px; margin-top: 5px; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; resize: vertical;"></textarea>
+        </div>
         
-        <button type="submit" style="background: #003366; color: white; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1.1em;">Salvar Modificações e Retramitar 🚀</button>
-        <a href="{{ url_for('main.index') }}" style="display: block; text-align: center; margin-top: 15px; color: #666; text-decoration: none; font-weight: bold;">⬅ Cancelar e Voltar</a>
+        <div class="flex-mobile" style="display: flex; gap: 10px;">
+            <button type="submit" style="flex: 2; background: #003366; color: white; padding: 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1.1em; transition: 0.3s;">
+                Salvar Modificações e Retramitar 🚀
+            </button>
+            <a href="{{ url_for('main.index') }}" style="flex: 1; display: flex; align-items: center; justify-content: center; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; transition: 0.3s;">
+                Cancelar
+            </a>
+        </div>
     </form>
 
     {% for f in doc.files %}
     <form id="del-form-{{f.id}}" action="{{ url_for('main.delete_file', file_id=f.id) }}" method="POST" style="display: none;"></form>
     {% endfor %}
 </div>
+
+<style>
+    /* Reforço de responsividade para botões e inputs */
+    @media (max-width: 768px) {
+        .flex-mobile { flex-direction: column !important; gap: 10px !important; }
+        button, a { width: 100% !important; padding: 15px !important; }
+    }
+</style>
 {% endblock %}

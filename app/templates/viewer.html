@@ -11,31 +11,39 @@
         <div style="border-bottom: 2px solid #002244; margin-bottom: 15px; padding-bottom: 10px;">
             <h2 style="margin: 0; color: #002244;">{{ doc.protocol }}</h2>
             <p style="margin: 5px 0; color: #666;"><strong>Assunto:</strong> {{ doc.name }}</p>
-            <p style="margin: 5px 0; color: #666;"><strong>Status:</strong> <span style="background: #e2e3e5; padding: 2px 6px; border-radius: 3px;">{{ doc.status }}</span></p>
+            <p style="margin: 5px 0; color: #666;"><strong>CPF/CNPJ:</strong> {{ doc.cpf_cnpj or '-' }}</p>
+            <p style="margin: 5px 0; color: #666;"><strong>Status:</strong> 
+                <span style="font-weight: bold; padding: 2px 6px; border-radius: 3px;
+                    {% if doc.status == 'Devolvido - Operador' %} background: #f8d7da; color: #721c24;
+                    {% elif doc.status == 'Aguardando Empenho - Operador' %} background: #d4edda; color: #155724;
+                    {% else %} background: #e2e3e5; color: #333; {% endif %}">
+                    {{ doc.status }}
+                </span>
+            </p>
         </div>
 
         <div style="margin-bottom: 20px; background: #f1f3f5; padding: 15px; border-radius: 6px;">
-            <label><strong>📎 Arquivos do Processo:</strong></label>
+            <label><strong>📎 Documentos do Processo ({{ doc.files|length }}):</strong></label>
             <ul style="list-style: none; padding-left: 0; margin-top: 10px;">
                 
                 {% for f in doc.files if f.file_type == 'Nota de Empenho' %}
-                <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; background: #d4edda; padding: 5px; border-radius: 4px; border-left: 4px solid #28a745;">
-                    <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #28a745; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️ Baixar</a>
+                <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; background: #d4edda; padding: 8px; border-radius: 4px; border-left: 4px solid #28a745;">
+                    <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #28a745; color: white; padding: 6px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️</a>
                     <span style="font-size: 0.85em; color: #155724;"><b>[Empenho]</b> <br> {{ f.filename.split('/')[-1] }}</span>
                 </li>
                 {% endfor %}
 
                 {% if role != 'Usuário Comum' %}
                     {% for f in doc.files if f.file_type == 'Minuta' %}
-                    <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; padding: 5px; border-left: 4px solid #004085;">
-                        <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #17a2b8; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️ Baixar</a>
+                    <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 4px; background: #fff; border-left: 4px solid #004085; border: 1px solid #ddd;">
+                        <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #17a2b8; color: white; padding: 6px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️</a>
                         <span style="font-size: 0.85em; color: #333;"><b>[Minuta]</b> <br> {{ f.filename.split('/')[-1] }}</span>
                     </li>
                     {% endfor %}
 
                     {% for f in doc.files if f.file_type == 'Anexo' %}
-                    <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; padding: 5px; border-left: 4px solid #6c757d;">
-                        <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #6c757d; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️ Baixar</a>
+                    <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 4px; background: #fff; border-left: 4px solid #6c757d; border: 1px solid #ddd;">
+                        <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #6c757d; color: white; padding: 6px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️</a>
                         <span style="font-size: 0.85em; color: #333;"><b>[Anexo]</b> <br> {{ f.filename.split('/')[-1] }}</span>
                     </li>
                     {% endfor %}
@@ -43,13 +51,13 @@
             </ul>
         </div>
 
-        <label><strong>📜 Histórico de Observações:</strong></label>
-        <div style="flex-grow: 1; min-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; white-space: pre-wrap; margin-top: 5px; margin-bottom: 20px; font-family: 'Courier New', Courier, monospace;">{{ doc.current_observation or "Nenhuma observação registrada." }}</div>
+        <label><strong>📜 Histórico de Despachos:</strong></label>
+        <div style="flex-grow: 1; min-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85em; white-space: pre-wrap; margin-top: 5px; margin-bottom: 20px; font-family: 'Consolas', 'Courier New', monospace; color: #444;">{{ doc.current_observation or "Nenhuma observação registrada." }}</div>
 
         {% if role not in ['Usuário Comum', 'Operador'] and doc.status not in ['Arquivado', 'Cancelado', 'Devolvido - Operador', 'Aguardando Empenho - Operador'] %}
             <form action="{{ url_for('main.process_action', doc_id=doc.id, action='aprovar') }}" method="POST" id="action-form">
-                <label><strong>✍️ Seu Parecer / Despacho:</strong></label>
-                <textarea name="new_observation" style="width: 100%; height: 80px; margin-top: 5px; padding: 10px; border-radius: 4px; border: 1px solid #ccc; resize: none;" placeholder="Digite aqui a observação para o próximo nível hierárquico..." required></textarea>
+                <label><strong>✍️ Seu Parecer:</strong></label>
+                <textarea name="new_observation" style="width: 100%; height: 80px; margin-top: 5px; padding: 10px; border-radius: 4px; border: 1px solid #ccc; resize: none;" placeholder="Digite aqui o despacho para o próximo nível..." required></textarea>
                 
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                     <button type="submit" style="flex: 1; background: #28a745; color: white; padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1em;">✅ APROVAR</button>
@@ -61,20 +69,20 @@
             </form>
         {% else %}
             <div style="background: #e9ecef; padding: 15px; border-radius: 4px; text-align: center; color: #666; font-size: 0.9em;">
-                <em>Modo de visualização apenas.<br>Nenhuma ação pendente para o seu perfil.</em>
+                <em>Modo de visualização.<br>Nenhuma ação pendente.</em>
             </div>
         {% endif %}
 
-        <a href="#" onclick="window.history.back(); return false;" style="display: block; text-align: center; margin-top: 20px; color: #003366; text-decoration: none; font-weight: bold; background: #e2e3e5; padding: 10px; border-radius: 4px;">⬅ Voltar aos Resultados</a>
+        <a href="#" onclick="window.history.back(); return false;" style="display: block; text-align: center; margin-top: 20px; color: #003366; text-decoration: none; font-weight: bold; background: #e2e3e5; padding: 12px; border-radius: 4px; transition: 0.3s;">⬅ Voltar aos Resultados</a>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-
 <script>
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
+    // Captura URLs de TODOS os arquivos vinculados (incluindo edições)
     const urls = [
         {% for f in doc.files if f.file_type == 'Nota de Empenho' %} "{{ url_for('main.get_pdf', filename=f.filename) }}", {% endfor %}
         {% if role != 'Usuário Comum' %}
@@ -86,7 +94,7 @@
     async function loadAllPDFs() {
         const container = document.getElementById('canvas-container');
         if (urls.length === 0) {
-            container.innerHTML = '<p style="color:white; text-align:center; margin-top: 50px;">Nenhum arquivo em formato PDF disponível para o seu perfil.</p>';
+            container.innerHTML = '<p style="color:white; text-align:center; margin-top: 50px;">Nenhum arquivo disponível.</p>';
             return;
         }
         for (const url of urls) {
@@ -115,11 +123,18 @@
     }
     loadAllPDFs();
 </script>
+
 <style>
     #pdf-viewer::-webkit-scrollbar { width: 8px; }
     #pdf-viewer::-webkit-scrollbar-track { background: #333; }
     #pdf-viewer::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
     #pdf-viewer::-webkit-scrollbar-thumb:hover { background: #aaa; }
     .pdf-page { max-width: 100%; height: auto !important; }
+    
+    /* Ajuste para mobile */
+    @media (max-width: 768px) {
+        .flex-mobile { flex-direction: column !important; }
+        #pdf-viewer { height: 60vh !important; }
+    }
 </style>
 {% endblock %}
