@@ -1,35 +1,69 @@
 {% extends 'base.html' %}
-
 {% block content %}
 <div style="display: flex; height: 88vh; gap: 20px;">
     
     <div id="pdf-viewer" style="flex: 2; background: #525659; overflow-y: auto; padding: 20px; border-radius: 8px;">
-        <div id="canvas-container">
-            </div>
+        <div id="canvas-container"></div>
     </div>
 
-    <div style="flex: 1; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column;">
+    <div style="flex: 1; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow-y: auto;">
         
         <div style="border-bottom: 2px solid #002244; margin-bottom: 15px; padding-bottom: 10px;">
             <h2 style="margin: 0; color: #002244;">{{ doc.protocol }}</h2>
             <p style="margin: 5px 0; color: #666;"><strong>Assunto:</strong> {{ doc.name }}</p>
+            <p style="margin: 5px 0; color: #666;"><strong>Status:</strong> <span style="background: #e2e3e5; padding: 2px 6px; border-radius: 3px;">{{ doc.status }}</span></p>
+        </div>
+
+        <div style="margin-bottom: 20px; background: #f1f3f5; padding: 15px; border-radius: 6px;">
+            <label><strong>📎 Arquivos do Processo:</strong></label>
+            <ul style="list-style: none; padding-left: 0; margin-top: 10px;">
+                
+                {% for f in doc.files if f.file_type == 'Nota de Empenho' %}
+                <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; background: #d4edda; padding: 5px; border-radius: 4px; border-left: 4px solid #28a745;">
+                    <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #28a745; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️ Baixar</a>
+                    <span style="font-size: 0.85em; color: #155724;"><b>[Empenho]</b> <br> {{ f.filename.split('/')[-1] }}</span>
+                </li>
+                {% endfor %}
+
+                {% if role != 'Usuário Comum' %}
+                    {% for f in doc.files if f.file_type == 'Minuta' %}
+                    <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; padding: 5px; border-left: 4px solid #004085;">
+                        <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #17a2b8; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️ Baixar</a>
+                        <span style="font-size: 0.85em; color: #333;"><b>[Minuta]</b> <br> {{ f.filename.split('/')[-1] }}</span>
+                    </li>
+                    {% endfor %}
+
+                    {% for f in doc.files if f.file_type == 'Anexo' %}
+                    <li style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px; padding: 5px; border-left: 4px solid #6c757d;">
+                        <a href="{{ url_for('main.get_pdf', filename=f.filename) }}" download class="btn" style="background: #6c757d; color: white; padding: 4px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em; font-weight: bold;">⬇️ Baixar</a>
+                        <span style="font-size: 0.85em; color: #333;"><b>[Anexo]</b> <br> {{ f.filename.split('/')[-1] }}</span>
+                    </li>
+                    {% endfor %}
+                {% endif %}
+            </ul>
         </div>
 
         <label><strong>📜 Histórico de Observações:</strong></label>
-        <div style="flex-grow: 1; height: 250px; overflow-y: auto; background: #f8f9fa; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; white-space: pre-wrap; margin-top: 5px; margin-bottom: 20px; font-family: 'Courier New', Courier, monospace;">{{ doc.current_observation or "Nenhuma observação registrada." }}</div>
+        <div style="flex-grow: 1; min-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; white-space: pre-wrap; margin-top: 5px; margin-bottom: 20px; font-family: 'Courier New', Courier, monospace;">{{ doc.current_observation or "Nenhuma observação registrada." }}</div>
 
-        <form action="{{ url_for('main.process_action', doc_id=doc.id, action='aprovar') }}" method="POST" id="action-form">
-            <label><strong>✍️ Seu Parecer / Despacho:</strong></label>
-            <textarea name="new_observation" style="width: 100%; height: 100px; margin-top: 5px; padding: 10px; border-radius: 4px; border: 1px solid #ccc; resize: none;" placeholder="Digite aqui a observação para o próximo nível hierárquico..." required></textarea>
-            
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button type="submit" style="flex: 1; background: #28a745; color: white; padding: 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1em;">✅ APROVAR</button>
+        {% if role not in ['Usuário Comum', 'Operador'] and doc.status not in ['Arquivado', 'Cancelado', 'Devolvido - Operador', 'Aguardando Empenho - Operador'] %}
+            <form action="{{ url_for('main.process_action', doc_id=doc.id, action='aprovar') }}" method="POST" id="action-form">
+                <label><strong>✍️ Seu Parecer / Despacho:</strong></label>
+                <textarea name="new_observation" style="width: 100%; height: 80px; margin-top: 5px; padding: 10px; border-radius: 4px; border: 1px solid #ccc; resize: none;" placeholder="Digite aqui a observação para o próximo nível hierárquico..." required></textarea>
                 
-                <button type="submit" name="action_alt" value="rejeitar" 
-                        onclick="this.form.action='{{ url_for('main.process_action', doc_id=doc.id, action='rejeitar') }}';" 
-                        style="flex: 1; background: #dc3545; color: white; padding: 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1em;">❌ REJEITAR</button>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="submit" style="flex: 1; background: #28a745; color: white; padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1em;">✅ APROVAR</button>
+                    
+                    <button type="submit" name="action_alt" value="rejeitar" 
+                            onclick="this.form.action='{{ url_for('main.process_action', doc_id=doc.id, action='rejeitar') }}';" 
+                            style="flex: 1; background: #dc3545; color: white; padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1em;">❌ REJEITAR</button>
+                </div>
+            </form>
+        {% else %}
+            <div style="background: #e9ecef; padding: 15px; border-radius: 4px; text-align: center; color: #666; font-size: 0.9em;">
+                <em>Modo de visualização apenas.<br>Nenhuma ação pendente para o seu perfil.</em>
             </div>
-        </form>
+        {% endif %}
 
         <a href="{{ url_for('main.index') }}" style="display: block; text-align: center; margin-top: 20px; color: #003366; text-decoration: none; font-weight: bold;">⬅ Voltar ao Painel</a>
     </div>
@@ -38,77 +72,55 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 
 <script>
-    // Configuração inicial do PDF.js
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-    // Lista de arquivos vinda do backend
-    const urls = [{% for f in doc.files %} "{{ url_for('main.get_pdf', filename=f.filename) }}", {% endfor %}];
+    // Montando as URLs na exata mesma ordem do HTML
+    const urls = [
+        {% for f in doc.files if f.file_type == 'Nota de Empenho' %} "{{ url_for('main.get_pdf', filename=f.filename) }}", {% endfor %}
+        {% if role != 'Usuário Comum' %}
+            {% for f in doc.files if f.file_type == 'Minuta' %} "{{ url_for('main.get_pdf', filename=f.filename) }}", {% endfor %}
+            {% for f in doc.files if f.file_type == 'Anexo' %} "{{ url_for('main.get_pdf', filename=f.filename) }}", {% endfor %}
+        {% endif %}
+    ];
 
     async function loadAllPDFs() {
         const container = document.getElementById('canvas-container');
-        
         if (urls.length === 0) {
-            container.innerHTML = '<p style="color:white; text-align:center;">Nenhum arquivo anexado a este processo.</p>';
+            container.innerHTML = '<p style="color:white; text-align:center; margin-top: 50px;">Nenhum arquivo em formato PDF disponível para o seu perfil.</p>';
             return;
         }
-
         for (const url of urls) {
             try {
                 const loadingTask = pdfjsLib.getDocument(url);
                 const pdf = await loadingTask.promise;
-
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const viewport = page.getViewport({ scale: 1.5 });
-                    
-                    // Cria o elemento canvas para cada página
                     const canvas = document.createElement('canvas');
                     canvas.className = 'pdf-page';
                     canvas.style.display = 'block';
                     canvas.style.margin = '20px auto';
-                    canvas.style.boxShadow = '0 8px 16px rgba(0,0,0,0.5)'; // Estilo de profundidade
+                    canvas.style.boxShadow = '0 8px 16px rgba(0,0,0,0.5)';
                     canvas.style.backgroundColor = 'white';
-
                     const ctx = canvas.getContext('2d');
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
-
-                    const renderContext = {
-                        canvasContext: ctx,
-                        viewport: viewport
-                    };
-
-                    // Aguarda a renderização da página terminar antes de carregar a próxima
-                    await page.render(renderContext).promise;
+                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
                     container.appendChild(canvas);
                 }
             } catch (error) {
                 console.error("Erro ao carregar PDF: " + url, error);
-                const errorDiv = document.createElement('div');
-                errorDiv.style.color = '#ff4444';
-                errorDiv.style.textAlign = 'center';
-                errorDiv.style.padding = '20px';
-                errorDiv.innerText = "⚠️ Erro ao renderizar arquivo: " + url.split('/').pop();
-                container.appendChild(errorDiv);
             }
         }
     }
-
-    // Inicia a carga
     loadAllPDFs();
 </script>
-
 <style>
-    /* Estilização da barra de rolagem do leitor para ficar discreta */
     #pdf-viewer::-webkit-scrollbar { width: 8px; }
     #pdf-viewer::-webkit-scrollbar-track { background: #333; }
     #pdf-viewer::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
     #pdf-viewer::-webkit-scrollbar-thumb:hover { background: #aaa; }
-    
-    .pdf-page {
-        max-width: 100%;
-        height: auto !important;
-    }
+    .pdf-page { max-width: 100%; height: auto !important; }
 </style>
 {% endblock %}

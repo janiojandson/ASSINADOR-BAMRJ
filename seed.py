@@ -5,14 +5,15 @@ from app.models import User
 app = create_app()
 
 with app.app_context():
-    # Cria a fundação da hierarquia
-    admin = User(username='admin', role='Admin')
+    db.create_all()
+    
+    # Criando os usuários iniciais já com o campo 'name'
+    admin = User(name='Administrador do Sistema', username='admin', role='Admin')
     admin.set_password('admin123')
     
-    # Cria o Operador para testes rápidos
-    operador = User(username='operador', role='Operador')
+    operador = User(name='Operador BAMRJ', username='operador', role='Operador')
     operador.set_password('bamrj123')
 
     db.session.add_all([admin, operador])
     db.session.commit()
-    print("[SUCESSO] Base do Sistema (Admin e Operador) iniciada!")
+    print("[SUCESSO] Base do Sistema iniciada com sucesso!")
