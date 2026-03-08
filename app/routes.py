@@ -24,16 +24,25 @@ def index():
     if search_query:
         base_query = Document.query.filter(extract('year', Document.created_at) == int(ano_filtro))
         if role == 'Usuário Comum':
-            documents = base_query.filter((Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) & (Document.status == 'Arquivado')).all()
+            # ⬅️ Busca ampliada para o Usuário Comum ver todos os status finais
+            documents = base_query.filter(
+                (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
+                (Document.solemp.ilike(f'%{search_query_clean}%'))
+            ).filter(Document.status.in_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])).all()
         else:
-            documents = base_query.filter((Document.name.ilike(f'%{search_query}%')) | (Document.protocol.ilike(f'%{search_query}%')) | (Document.cpf_cnpj.ilike(f'%{search_query_clean}%'))).all()
+            documents = base_query.filter(
+                (Document.name.ilike(f'%{search_query}%')) | 
+                (Document.protocol.ilike(f'%{search_query}%')) | 
+                (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
+                (Document.solemp.ilike(f'%{search_query_clean}%')) # ⬅️ Busca por SOLEMP
+            ).all()
         return render_template('dashboard.html', documents=documents, role=role, is_substitute=is_sub)
 
     inbox_statuses = []
     if role == 'Operador':
-        documents = Document.query.filter(Document.status.notin_(['Arquivado', 'Cancelado'])).order_by(Document.is_priority.desc(), Document.created_at.desc()).all()
+        # ⬅️ Oculta da dashboard do Operador tudo que é status final (incluindo Anulado/Reforçado)
+        documents = Document.query.filter(Document.status.notin_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])).order_by(Document.is_priority.desc(), Document.created_at.desc()).all()
         date_str = datetime.now().strftime('%Y%m%d')
-        # Lógica de contagem para o Polling (Devolvidos + Aguardando Empenho)
         inbox_count = sum(1 for d in documents if d.status in ['Devolvido - Operador', 'Aguardando Empenho - Operador'])
         return render_template('dashboard.html', documents=documents, role=role, pre_protocol=f"BAMRJ-{date_str}-{str(uuid.uuid4())[:4].upper()}", inbox_count=inbox_count)
         
@@ -104,16 +113,20 @@ def upload_document():
     protocolo = request.form.get('protocol')
     ano_atual = str(datetime.now().year)
     
-    # MUDANÇA TÁTICA: Pasta agora usa o PROTOCOLO para evitar perda de arquivos em edições de assunto
     caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_atual, protocolo)
     os.makedirs(caminho_processo, exist_ok=True)
     
     cpf_cnpj_raw = request.form.get('cpf_cnpj', '')
     cpf_cnpj_clean = re.sub(r'\D', '', cpf_cnpj_raw)
 
+    # ⬅️ NOVO: Trata e salva o SOLEMP na abertura original
+    solemp_raw = request.form.get('solemp', '')
+    solemp_clean = re.sub(r'\D', '', solemp_raw)
+
     novo_doc = Document(
         protocol=protocolo, name=request.form.get('process_name'),
-        cpf_cnpj=cpf_cnpj_clean, is_priority=True if request.form.get('priority') else False,
+        cpf_cnpj=cpf_cnpj_clean, solemp=solemp_clean, 
+        is_priority=True if request.form.get('priority') else False,
         current_observation=f"[Início] {request.form.get('observation')}",
         uploader_name=session.get('username'), status='Caixa de Entrada - Enc. Finanças'
     )
@@ -137,7 +150,9 @@ def upload_document():
 def edit_process(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     doc = Document.query.get_or_404(doc_id)
-    if doc.status != 'Devolvido - Operador': return "Processo não está em status de devolução", 403
+    # ⬅️ MUDANÇA: Libera a tela de edição para iniciar Reforço ou Anulação de processos que já fecharam
+    if doc.status not in ['Devolvido - Operador', 'Arquivado', 'Reforçado', 'Anulado']: 
+        return "Processo não está em status que permita edição ou reabertura", 403
     return render_template('edit_process.html', doc=doc)
 
 @main.route('/update_process/<int:doc_id>', methods=['POST'])
@@ -145,18 +160,17 @@ def update_process(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     doc = Document.query.get_or_404(doc_id)
     
-    # Atualiza dados sem quebrar o caminho físico
+    # ⬅️ ATUALIZAÇÃO GERAL: Atualiza nomes, CPF e agora o SOLEMP
     doc.name = request.form.get('process_name')
     doc.cpf_cnpj = re.sub(r'\D', '', request.form.get('cpf_cnpj', ''))
+    doc.solemp = re.sub(r'\D', '', request.form.get('solemp', ''))
     doc.is_priority = True if request.form.get('priority') else False
     
-    # Recupera a pasta original baseada no Protocolo e Ano de criação
     ano_doc = str(doc.created_at.year)
     protocolo = doc.protocol
     caminho_processo = os.path.join(current_app.config['UPLOAD_FOLDER'], ano_doc, protocolo)
     os.makedirs(caminho_processo, exist_ok=True)
     
-    # Adiciona novos arquivos mantendo os antigos
     for f in request.files.getlist('minutas'):
         if f and f.filename:
             fname = secure_filename(f.filename)
@@ -170,9 +184,18 @@ def update_process(doc_id):
             db.session.add(DocumentFile(document_id=doc.id, filename=f"{ano_doc}/{protocolo}/{fname}", file_type='Anexo'))
             
     obs = request.form.get('observation')
+    
+    # ⬅️ INTELIGÊNCIA DE REABERTURA: Se era um processo fechado, registra que é uma reabertura de ciclo
+    if doc.status in ['Arquivado', 'Reforçado', 'Anulado']:
+        db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='REABERTURA', observation=obs))
+        doc.current_observation += f"\n[{datetime.now().strftime('%d/%m %H:%M')} - Operador]: [Abertura de Reforço/Anulação] {obs}"
+    else:
+        db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='RETRAMITAR', observation=obs))
+        doc.current_observation += f"\n[{datetime.now().strftime('%d/%m %H:%M')} - Operador]: [Revisado/Retramitado] {obs}"
+    
+    # Independentemente se foi devolvido ou é uma reabertura de reforço, ele volta pro início da fila!
     doc.status = 'Caixa de Entrada - Enc. Finanças'
-    db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='RETRAMITAR', observation=obs))
-    doc.current_observation += f"\n[{datetime.now().strftime('%d/%m %H:%M')} - Operador]: [Revisado/Retramitado] {obs}"
+    
     db.session.commit()
     return redirect(url_for('main.index'))
 
@@ -181,7 +204,6 @@ def delete_file(file_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     f = DocumentFile.query.get_or_404(file_id)
     doc_id = f.document_id
-    # Remove do banco; o arquivo físico permanece por segurança (doutrina militar)
     db.session.delete(f)
     db.session.commit()
     return redirect(url_for('main.edit_process', doc_id=doc_id))
@@ -223,7 +245,12 @@ def cancel_document(doc_id):
 @main.route('/upload_ne/<int:doc_id>', methods=['POST'])
 def upload_ne(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
-    doc = Document.query.get_or_404(doc_id); arquivo_ne = request.files.get('nota_empenho')
+    doc = Document.query.get_or_404(doc_id)
+    arquivo_ne = request.files.get('nota_empenho')
+    
+    # ⬅️ NOVO: Captura o status final escolhido pelo operador (Arquivado, Reforçado, Anulado)
+    status_final = request.form.get('final_status', 'Arquivado')
+
     if arquivo_ne and arquivo_ne.filename:
         ano_atual = str(datetime.now().year)
         protocolo = doc.protocol
@@ -232,8 +259,9 @@ def upload_ne(doc_id):
         fname = secure_filename(arquivo_ne.filename)
         arquivo_ne.save(os.path.join(caminho_processo, fname))
         db.session.add(DocumentFile(document_id=doc.id, filename=f"{ano_atual}/{protocolo}/{fname}", file_type='Nota de Empenho'))
-        doc.status = 'Arquivado'
-        db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='ANEXAR_NE', observation='Nota de Empenho anexada.'))
+        
+        doc.status = status_final # Aplica o status correto
+        db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='ANEXAR_NE', observation=f'Nota de Empenho ({status_final}) anexada.'))
         db.session.commit()
     return redirect(url_for('main.index'))
 
@@ -249,9 +277,16 @@ def arquivo():
     search_query = request.args.get('q', '')
     search_query_clean = re.sub(r'\D', '', search_query) if search_query else ''
     ano_filtro = request.args.get('ano', str(datetime.now().year))
-    query = Document.query.filter(Document.status.in_(['Arquivado', 'Cancelado'])).filter(extract('year', Document.created_at) == int(ano_filtro))
+    
+    # ⬅️ Busca inclui Cancelado, Anulado e Reforçado
+    query = Document.query.filter(Document.status.in_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])).filter(extract('year', Document.created_at) == int(ano_filtro))
     if search_query:
-        query = query.filter((Document.name.ilike(f'%{search_query}%')) | (Document.protocol.ilike(f'%{search_query}%')) | (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')))
+        query = query.filter(
+            (Document.name.ilike(f'%{search_query}%')) | 
+            (Document.protocol.ilike(f'%{search_query}%')) | 
+            (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
+            (Document.solemp.ilike(f'%{search_query_clean}%')) # ⬅️ Busca por SOLEMP no arquivo
+        )
     documents = query.order_by(Document.created_at.desc()).all()
     return render_template('arquivo.html', documents=documents, role=role)
 
@@ -272,7 +307,6 @@ def check_inbox():
         if is_sub: inbox_statuses.append('Caixa de Entrada - Diretor')
     elif role == 'Diretor': inbox_statuses = ['Caixa de Entrada - Diretor']
     elif role == 'Operador':
-        # Conta Devolvidos e Aguardando Empenho para o Polling
         count = Document.query.filter(Document.status.in_(['Devolvido - Operador', 'Aguardando Empenho - Operador'])).count()
         return jsonify({'count': count})
     else: return jsonify({'count': 0}) 

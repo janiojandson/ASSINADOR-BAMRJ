@@ -22,7 +22,8 @@ class Document(db.Model):
     protocol = db.Column(db.String(32), unique=True, nullable=False)
     name = db.Column(db.String(128), nullable=False)
     cpf_cnpj = db.Column(db.String(20), nullable=True)
-    status = db.Column(db.String(64), default='Caixa de Entrada - Enc. Finanças') # ATUALIZADO
+    solemp = db.Column(db.String(50), nullable=True) # ⬅️ NOVO CAMPO SOLEMP
+    status = db.Column(db.String(64), default='Caixa de Entrada - Enc. Finanças')
     is_priority = db.Column(db.Boolean, default=False)
     current_observation = db.Column(db.Text, nullable=True)
     uploader_name = db.Column(db.String(64)) 

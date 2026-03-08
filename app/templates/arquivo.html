@@ -4,17 +4,16 @@
 <div class="flex-mobile" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #002244; color: white; padding: 15px; border-radius: 5px; flex-wrap: wrap; gap: 15px;">
     <div>
         <h3 style="margin: 0;">🗄️ Arquivo Geral de Processos</h3>
-        <p style="margin: 5px 0 0 0; font-size: 0.85em; color: #ccc;">Consulta de processos finalizados e cancelados.</p>
+        <p style="margin: 5px 0 0 0; font-size: 0.85em; color: #ccc;">Consulta de processos finalizados, anulados e reforçados.</p>
     </div>
     
     <form action="{{ url_for('main.arquivo') }}" method="GET" class="flex-mobile-form" style="display: flex; gap: 5px; width: 100%; justify-content: flex-end;">
         <select name="ano" id="filtro-ano-arq" style="padding: 8px; border: none; border-radius: 3px; font-weight: bold; color: #002244;"></select>
-        <input type="text" name="q" placeholder="Buscar no arquivo (Nome, CNPJ...)" style="padding: 8px; border: none; width: 280px; border-radius: 3px;">
+        <input type="text" name="q" placeholder="Buscar no arquivo (SOLEMP, Nome, CNPJ...)" style="padding: 8px; border: none; width: 280px; border-radius: 3px;">
         <button type="submit" style="padding: 8px 15px; background: #004488; color: white; border: none; border-radius: 3px; cursor: pointer;">🔍</button>
     </form>
     
     <script>
-        // Gera anos automaticamente a partir de 2026
         const selectAnoArq = document.getElementById('filtro-ano-arq');
         const anoAtualArq = new Date().getFullYear();
         const anoMaximoArq = anoAtualArq < 2026 ? 2026 : anoAtualArq;
@@ -23,7 +22,7 @@
             let opt = document.createElement('option');
             opt.value = ano;
             opt.innerHTML = ano;
-            const urlParams = new URLSearchParams(window.location.search);
+            const urlParams = newSearchParams(window.location.search);
             const anoPesquisado = urlParams.get('ano');
             if (anoPesquisado && parseInt(anoPesquisado) === ano) {
                 opt.selected = true;
@@ -42,36 +41,46 @@
     </div>
     
     <div class="table-responsive">
-        <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
-            <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; text-align: left;">
-                <th style="padding: 10px;">Protocolo</th>
-                <th style="padding: 10px;">Assunto</th>
-                <th style="padding: 10px;">CPF/CNPJ</th>
-                <th style="padding: 10px;">Status Final</th>
-                <th style="padding: 10px;">Ação</th>
-            </tr>
+        <table style="width: 100%; border-collapse: collapse; min-width: 800px;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd; text-align: left;">
+                    <th style="padding: 10px;">Protocolo</th>
+                    <th style="padding: 10px;">Assunto</th>
+                    <th style="padding: 10px;">CPF/CNPJ</th>
+                    <th style="padding: 10px;">SOLEMP</th> <th style="padding: 10px;">Status Final</th>
+                    <th style="padding: 10px;">Ação</th>
+                </tr>
+            </thead>
             
-            {% for doc in documents %}
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 10px;"><code>{{ doc.protocol }}</code></td>
-                <td style="padding: 10px;">{{ doc.name }}</td>
-                <td style="padding: 10px;">{{ doc.cpf_cnpj or '-' }}</td>
-                <td style="padding: 10px;">
-                    <span style="font-size: 0.8em; padding: 4px 8px; border-radius: 4px; font-weight: bold;
-                        {% if doc.status == 'Arquivado' %} background: #d4edda; color: #155724; 
-                        {% else %} background: #f8d7da; color: #721c24; {% endif %}">
-                        {{ doc.status }}
-                    </span>
-                </td>
-                <td class="mobile-action-buttons" style="padding: 10px;">
-                    <a href="{{ url_for('main.view_process', doc_id=doc.id) }}" style="background: #003366; color: white; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em; display: inline-block;">Abrir</a>
-                </td>
-            </tr>
-            {% endfor %}
+            <tbody>
+                {% for doc in documents %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;"><code>{{ doc.protocol }}</code></td>
+                    <td style="padding: 10px;">{{ doc.name }}</td>
+                    <td style="padding: 10px;">{{ doc.cpf_cnpj or '-' }}</td>
+                    <td style="padding: 10px;"><strong>{{ doc.solemp or '-' }}</strong></td> <td style="padding: 10px;">
+                        <span style="font-size: 0.8em; padding: 4px 8px; border-radius: 4px; font-weight: bold;
+                            {% if doc.status == 'Arquivado' %} background: #d4edda; color: #155724; border: 1px solid #c3e6cb;
+                            {% elif doc.status in ['Cancelado', 'Anulado'] %} background: #343a40; color: white;
+                            {% elif doc.status == 'Reforçado' %} background: #17a2b8; color: white;
+                            {% else %} background: #e2e3e5; color: #383d41; {% endif %}">
+                            {{ doc.status }}
+                        </span>
+                    </td>
+                    <td class="mobile-action-buttons" style="padding: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
+                        <a href="{{ url_for('main.view_process', doc_id=doc.id) }}" style="background: #003366; color: white; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em;">Abrir</a>
+                        
+                        {% if role == 'Operador' and doc.status in ['Arquivado', 'Reforçado', 'Anulado'] %}
+                            <a href="{{ url_for('main.edit_process', doc_id=doc.id) }}" style="background: #28a745; color: white; padding: 5px 12px; text-decoration: none; border-radius: 3px; font-weight: bold; font-size: 0.9em;">➕ Reforço/Anulação</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
             
             {% if not documents %}
             <tr>
-                <td colspan="5" style="text-align: center; padding: 30px; color: #666;">
+                <td colspan="6" style="text-align: center; padding: 30px; color: #666;">
                     Nenhum processo encontrado no arquivo.
                 </td>
             </tr>

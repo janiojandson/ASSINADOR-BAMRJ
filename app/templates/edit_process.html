@@ -1,22 +1,38 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="card" style="border-top: 5px solid #ffcc00; max-width: 800px; margin: auto;">
-    <h3 style="color: #002244; margin-top: 0;">✏️ Edição e Retramitação de Processo</h3>
+<div class="card" style="border-top: 5px solid {% if doc.status == 'Devolvido - Operador' %}#ffcc00{% else %}#17a2b8{% endif %}; max-width: 800px; margin: auto;">
+    
+    <h3 style="color: #002244; margin-top: 0;">
+        {% if doc.status == 'Devolvido - Operador' %}
+            ✏️ Edição e Retramitação de Processo
+        {% else %}
+            🔄 Reabertura de Processo (Reforço/Anulação)
+        {% endif %}
+    </h3>
     
     <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
-        <strong>⚠️ Motivo da Devolução / Histórico:</strong><br>
+        <strong>
+            {% if doc.status == 'Devolvido - Operador' %}⚠️ Motivo da Devolução / Último Histórico:{% else %}⚠️ Último Despacho / Histórico:{% endif %}
+        </strong><br>
         <div style="white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: 0.9em; margin-top: 10px; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.05);">{{ doc.current_observation }}</div>
     </div>
 
     <form action="{{ url_for('main.update_process', doc_id=doc.id) }}" method="POST" enctype="multipart/form-data">
+        
         <div style="margin-bottom: 15px;">
             <label style="font-weight: bold; color: #002244;">Assunto do Processo:</label>
             <input type="text" name="process_name" value="{{ doc.name }}" required style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
         </div>
         
-        <div style="margin-bottom: 15px;">
-            <label style="font-weight: bold; color: #002244;">CPF ou CNPJ:</label>
-            <input type="text" name="cpf_cnpj" value="{{ doc.cpf_cnpj }}" placeholder="Apenas números" style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+        <div class="flex-mobile" style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+                <label style="font-weight: bold; color: #002244;">CPF ou CNPJ:</label>
+                <input type="text" name="cpf_cnpj" value="{{ doc.cpf_cnpj or '' }}" placeholder="Apenas números" style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+            <div style="flex: 1;">
+                <label style="font-weight: bold; color: #002244;">Nº da SOLEMP:</label>
+                <input type="text" name="solemp" value="{{ doc.solemp or '' }}" placeholder="Opcional" style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
         </div>
         
         <label style="display: block; margin-bottom: 20px; font-weight: bold; background: #fff3cd; padding: 12px; border-radius: 4px; border: 1px solid #ffeeba; cursor: pointer;">
@@ -24,7 +40,7 @@
         </label>
 
         <div style="background: #f1f3f5; padding: 15px; border-radius: 5px; margin-bottom: 25px; border: 1px solid #ddd;">
-            <h4 style="margin-top: 0; color: #002244; border-bottom: 1px solid #ccc; padding-bottom: 8px;">📂 Arquivos no Processo (Gestão Individual)</h4>
+            <h4 style="margin-top: 0; color: #002244; border-bottom: 1px solid #ccc; padding-bottom: 8px;">📂 Arquivos Atuais (Histórico Intocável da NE original)</h4>
             <ul style="list-style: none; padding: 0; margin: 10px 0 0 0;">
                 {% for f in doc.files %}
                 <li style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; gap: 10px;" class="flex-mobile">
@@ -46,7 +62,6 @@
         
         <h4 style="margin-bottom: 10px; color: #002244;">➕ Adicionar Novos Documentos</h4>
         <div style="display: flex; gap: 15px; margin-bottom: 25px;" class="flex-mobile">
-            
             <div style="flex: 1; background: #e9ecef; padding: 15px; border-radius: 5px; border: 1px dashed #adb5bd;">
                 <label style="font-size: 0.9em;"><strong>Novas Minutas (PDF):</strong></label><br>
                 <input type="file" id="m-in" accept="application/pdf" multiple style="margin-top:8px; width: 100%; font-size: 0.8em;">
@@ -63,13 +78,15 @@
         </div>
 
         <div style="margin-bottom: 20px;">
-            <label style="font-weight: bold; color: #002244;">Observação da Retificação:</label>
-            <textarea name="observation" placeholder="Descreva o que foi corrigido para a chefia..." required style="width: 100%; height: 100px; margin-top: 5px; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; resize: vertical;"></textarea>
+            <label style="font-weight: bold; color: #002244;">
+                {% if doc.status == 'Devolvido - Operador' %}Observação da Retificação:{% else %}Justificativa para Reabertura:{% endif %}
+            </label>
+            <textarea name="observation" placeholder="{% if doc.status == 'Devolvido - Operador' %}Descreva o que foi corrigido...{% else %}Descreva os motivos para o reforço ou anulação da NE...{% endif %}" required style="width: 100%; height: 100px; margin-top: 5px; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; resize: vertical;"></textarea>
         </div>
         
         <div class="flex-mobile" style="display: flex; gap: 10px;">
             <button type="submit" style="flex: 2; background: #003366; color: white; padding: 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1.1em;">
-                Salvar e Retramitar 🚀
+                Salvar e Tramitar 🚀
             </button>
             <a href="{{ url_for('main.index') }}" style="flex: 1; display: flex; align-items: center; justify-content: center; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
                 Cancelar
@@ -83,7 +100,6 @@
 </div>
 
 <script>
-    // Motor JavaScript para gerenciar a lista de arquivos e exclusão pré-envio
     const dtM = new DataTransfer(), dtA = new DataTransfer();
 
     function setup(inId, hidId, listId, dt) {
