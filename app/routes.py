@@ -293,6 +293,22 @@ def arquivo():
 @main.route('/get_pdf/<path:filename>')
 def get_pdf(filename): return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
+@main.route('/reset_secreto_banco_1234')
+def reset_secreto():
+    # ⚠️ ROTA TÁTICA DE RESET - USAR APENAS UMA VEZ
+    try:
+        db.drop_all()
+        db.create_all()
+        
+        admin_user = User(name="Administrador", username="admin", role="Admin")
+        admin_user.set_password("admin123") # Senha padrão
+        
+        db.session.add(admin_user)
+        db.session.commit()
+        return "<h1>Senhor! Base de dados (Postgres) recriada com sucesso!</h1><p>A coluna SOLEMP foi inserida e o usuário Admin foi gerado. O senhor já pode acessar o sistema normal.</p>"
+    except Exception as e:
+        return f"Erro ao resetar: {str(e)}"
+
 @main.route('/api/check_inbox')
 def check_inbox():
     if 'user_id' not in session: return jsonify({'count': 0})
