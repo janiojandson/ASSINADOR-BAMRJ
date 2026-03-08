@@ -44,15 +44,21 @@
             {% endif %}
         </div>
         
-        <h4 style="margin-bottom: 10px; color: #002244;">➕ Adicionar Novos (Múltipla Seleção Habilitada)</h4>
+        <h4 style="margin-bottom: 10px; color: #002244;">➕ Adicionar Novos Documentos</h4>
         <div style="display: flex; gap: 15px; margin-bottom: 25px;" class="flex-mobile">
+            
             <div style="flex: 1; background: #e9ecef; padding: 15px; border-radius: 5px; border: 1px dashed #adb5bd;">
                 <label style="font-size: 0.9em;"><strong>Novas Minutas (PDF):</strong></label><br>
-                <input type="file" name="minutas" accept="application/pdf" multiple style="margin-top:8px; width: 100%; font-size: 0.8em;">
+                <input type="file" id="m-in" accept="application/pdf" multiple style="margin-top:8px; width: 100%; font-size: 0.8em;">
+                <ul id="m-list" style="list-style: none; padding: 0; margin-top: 10px; font-size: 0.8em; color: #555;"></ul>
+                <input type="file" name="minutas" id="m-hidden" multiple style="display: none;">
             </div>
+
             <div style="flex: 1; background: #e9ecef; padding: 15px; border-radius: 5px; border: 1px dashed #adb5bd;">
                 <label style="font-size: 0.9em;"><strong>Novos Anexos (PDF):</strong></label><br>
-                <input type="file" name="anexos" accept="application/pdf" multiple style="margin-top:8px; width: 100%; font-size: 0.8em;">
+                <input type="file" id="a-in" accept="application/pdf" multiple style="margin-top:8px; width: 100%; font-size: 0.8em;">
+                <ul id="a-list" style="list-style: none; padding: 0; margin-top: 10px; font-size: 0.8em; color: #555;"></ul>
+                <input type="file" name="anexos" id="a-hidden" multiple style="display: none;">
             </div>
         </div>
 
@@ -75,4 +81,57 @@
     <form id="del-form-{{f.id}}" action="{{ url_for('main.delete_file', file_id=f.id) }}" method="POST" style="display: none;"></form>
     {% endfor %}
 </div>
+
+<script>
+    // Motor JavaScript para gerenciar a lista de arquivos e exclusão pré-envio
+    const dtM = new DataTransfer(), dtA = new DataTransfer();
+
+    function setup(inId, hidId, listId, dt) {
+        const inp = document.getElementById(inId), hid = document.getElementById(hidId), list = document.getElementById(listId);
+        
+        inp.addEventListener('change', () => {
+            for(let f of inp.files) dt.items.add(f);
+            render();
+        });
+
+        function render() {
+            list.innerHTML = ''; 
+            hid.files = dt.files;
+            Array.from(dt.files).forEach((f, i) => {
+                const li = document.createElement('li');
+                li.style.display = 'flex';
+                li.style.justifyContent = 'space-between';
+                li.style.background = '#fff';
+                li.style.padding = '5px 8px';
+                li.style.marginBottom = '4px';
+                li.style.borderRadius = '3px';
+                li.style.border = '1px solid #ddd';
+                li.innerHTML = `<span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${f.name}</span> 
+                                <b onclick="window.remEd('${inId}', ${i})" style="cursor:pointer; color:red; margin-left:10px;">[X]</b>`;
+                list.appendChild(li);
+            });
+        }
+        return { render };
+    }
+
+    const handlerM = setup('m-in', 'm-hidden', 'm-list', dtM);
+    const handlerA = setup('a-in', 'a-hidden', 'a-list', dtA);
+
+    window.remEd = (inId, i) => {
+        if(inId === 'm-in') {
+            dtM.items.remove(i);
+            handlerM.render();
+        } else {
+            dtA.items.remove(i);
+            handlerA.render();
+        }
+    };
+</script>
+
+<style>
+    @media (max-width: 768px) {
+        .flex-mobile { flex-direction: column !important; gap: 10px !important; }
+        button, a { width: 100% !important; padding: 15px !important; }
+    }
+</style>
 {% endblock %}
