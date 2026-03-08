@@ -9,6 +9,9 @@ class User(db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(64), nullable=False)
+    
+    # ⬅️ NOVO: Trava de segurança para obrigar a troca de senha no primeiro acesso
+    must_change_password = db.Column(db.Boolean, default=True) 
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -22,7 +25,7 @@ class Document(db.Model):
     protocol = db.Column(db.String(32), unique=True, nullable=False)
     name = db.Column(db.String(128), nullable=False)
     cpf_cnpj = db.Column(db.String(20), nullable=True)
-    solemp = db.Column(db.String(50), nullable=True) # ⬅️ NOVO CAMPO SOLEMP
+    solemp = db.Column(db.String(50), nullable=True) # ⬅️ CAMPO SOLEMP
     status = db.Column(db.String(64), default='Caixa de Entrada - Enc. Finanças')
     is_priority = db.Column(db.Boolean, default=False)
     current_observation = db.Column(db.Text, nullable=True)

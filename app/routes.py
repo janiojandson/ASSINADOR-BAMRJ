@@ -12,6 +12,11 @@ main = Blueprint('main', __name__)
 def index():
     if 'user_id' not in session: return redirect(url_for('main.login'))
     
+    # ⬅️ BLOQUEIO DE SEGURANÇA: Obriga o usuário a trocar a senha se a trava estiver ativa
+    user_obj = User.query.get(session['user_id'])
+    if user_obj and user_obj.must_change_password:
+        return redirect(url_for('main.setup_password'))
+    
     role = session.get('role'); username = session.get('username')
     is_sub = session.get('is_substitute', False)
     search_query = request.args.get('q', '')
@@ -24,7 +29,6 @@ def index():
     if search_query:
         base_query = Document.query.filter(extract('year', Document.created_at) == int(ano_filtro))
         if role == 'Usuário Comum':
-            # ⬅️ Busca ampliada para o Usuário Comum ver todos os status finais
             documents = base_query.filter(
                 (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
                 (Document.solemp.ilike(f'%{search_query_clean}%'))
@@ -34,13 +38,12 @@ def index():
                 (Document.name.ilike(f'%{search_query}%')) | 
                 (Document.protocol.ilike(f'%{search_query}%')) | 
                 (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
-                (Document.solemp.ilike(f'%{search_query_clean}%')) # ⬅️ Busca por SOLEMP
+                (Document.solemp.ilike(f'%{search_query_clean}%'))
             ).all()
         return render_template('dashboard.html', documents=documents, role=role, is_substitute=is_sub)
 
     inbox_statuses = []
     if role == 'Operador':
-        # ⬅️ Oculta da dashboard do Operador tudo que é status final (incluindo Anulado/Reforçado)
         documents = Document.query.filter(Document.status.notin_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])).order_by(Document.is_priority.desc(), Document.created_at.desc()).all()
         date_str = datetime.now().strftime('%Y%m%d')
         inbox_count = sum(1 for d in documents if d.status in ['Devolvido - Operador', 'Aguardando Empenho - Operador'])
@@ -82,6 +85,7 @@ def create_user():
     if User.query.filter_by(username=username).first(): return "Erro: Usuário já existe.", 400
     new_user = User(name=name, username=username, role=role)
     new_user.set_password(password)
+    # Por padrão, must_change_password já é True na criação
     db.session.add(new_user); db.session.commit()
     return redirect(url_for('main.index'))
 
@@ -91,7 +95,10 @@ def edit_user():
     user = User.query.get(request.form.get('user_id'))
     if user:
         user.role = request.form.get('role')
-        if request.form.get('password'): user.set_password(request.form.get('password'))
+        if request.form.get('password'): 
+            user.set_password(request.form.get('password'))
+            # ⬅️ NOVO: Se o Admin resetar a senha, o usuário terá que trocar de novo
+            user.must_change_password = True
         db.session.commit()
     return redirect(url_for('main.index'))
 
@@ -119,7 +126,6 @@ def upload_document():
     cpf_cnpj_raw = request.form.get('cpf_cnpj', '')
     cpf_cnpj_clean = re.sub(r'\D', '', cpf_cnpj_raw)
 
-    # ⬅️ NOVO: Trata e salva o SOLEMP na abertura original
     solemp_raw = request.form.get('solemp', '')
     solemp_clean = re.sub(r'\D', '', solemp_raw)
 
@@ -150,7 +156,6 @@ def upload_document():
 def edit_process(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     doc = Document.query.get_or_404(doc_id)
-    # ⬅️ MUDANÇA: Libera a tela de edição para iniciar Reforço ou Anulação de processos que já fecharam
     if doc.status not in ['Devolvido - Operador', 'Arquivado', 'Reforçado', 'Anulado']: 
         return "Processo não está em status que permita edição ou reabertura", 403
     return render_template('edit_process.html', doc=doc)
@@ -160,7 +165,6 @@ def update_process(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     doc = Document.query.get_or_404(doc_id)
     
-    # ⬅️ ATUALIZAÇÃO GERAL: Atualiza nomes, CPF e agora o SOLEMP
     doc.name = request.form.get('process_name')
     doc.cpf_cnpj = re.sub(r'\D', '', request.form.get('cpf_cnpj', ''))
     doc.solemp = re.sub(r'\D', '', request.form.get('solemp', ''))
@@ -185,7 +189,6 @@ def update_process(doc_id):
             
     obs = request.form.get('observation')
     
-    # ⬅️ INTELIGÊNCIA DE REABERTURA: Se era um processo fechado, registra que é uma reabertura de ciclo
     if doc.status in ['Arquivado', 'Reforçado', 'Anulado']:
         db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='REABERTURA', observation=obs))
         doc.current_observation += f"\n[{datetime.now().strftime('%d/%m %H:%M')} - Operador]: [Abertura de Reforço/Anulação] {obs}"
@@ -193,7 +196,6 @@ def update_process(doc_id):
         db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='RETRAMITAR', observation=obs))
         doc.current_observation += f"\n[{datetime.now().strftime('%d/%m %H:%M')} - Operador]: [Revisado/Retramitado] {obs}"
     
-    # Independentemente se foi devolvido ou é uma reabertura de reforço, ele volta pro início da fila!
     doc.status = 'Caixa de Entrada - Enc. Finanças'
     
     db.session.commit()
@@ -247,8 +249,6 @@ def upload_ne(doc_id):
     if session.get('role') != 'Operador': return "Acesso Negado", 403
     doc = Document.query.get_or_404(doc_id)
     arquivo_ne = request.files.get('nota_empenho')
-    
-    # ⬅️ NOVO: Captura o status final escolhido pelo operador (Arquivado, Reforçado, Anulado)
     status_final = request.form.get('final_status', 'Arquivado')
 
     if arquivo_ne and arquivo_ne.filename:
@@ -260,7 +260,7 @@ def upload_ne(doc_id):
         arquivo_ne.save(os.path.join(caminho_processo, fname))
         db.session.add(DocumentFile(document_id=doc.id, filename=f"{ano_atual}/{protocolo}/{fname}", file_type='Nota de Empenho'))
         
-        doc.status = status_final # Aplica o status correto
+        doc.status = status_final
         db.session.add(Event(document_id=doc.id, user_name=session.get('username'), action='ANEXAR_NE', observation=f'Nota de Empenho ({status_final}) anexada.'))
         db.session.commit()
     return redirect(url_for('main.index'))
@@ -273,19 +273,24 @@ def view_process(doc_id):
 @main.route('/arquivo')
 def arquivo():
     if 'user_id' not in session: return redirect(url_for('main.login'))
+    
+    # ⬅️ BLOQUEIO DE SEGURANÇA no arquivo também
+    user_obj = User.query.get(session['user_id'])
+    if user_obj and user_obj.must_change_password:
+        return redirect(url_for('main.setup_password'))
+        
     role = session.get('role')
     search_query = request.args.get('q', '')
     search_query_clean = re.sub(r'\D', '', search_query) if search_query else ''
     ano_filtro = request.args.get('ano', str(datetime.now().year))
     
-    # ⬅️ Busca inclui Cancelado, Anulado e Reforçado
     query = Document.query.filter(Document.status.in_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])).filter(extract('year', Document.created_at) == int(ano_filtro))
     if search_query:
         query = query.filter(
             (Document.name.ilike(f'%{search_query}%')) | 
             (Document.protocol.ilike(f'%{search_query}%')) | 
             (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
-            (Document.solemp.ilike(f'%{search_query_clean}%')) # ⬅️ Busca por SOLEMP no arquivo
+            (Document.solemp.ilike(f'%{search_query_clean}%')) 
         )
     documents = query.order_by(Document.created_at.desc()).all()
     return render_template('arquivo.html', documents=documents, role=role)
@@ -295,19 +300,44 @@ def get_pdf(filename): return send_from_directory(current_app.config['UPLOAD_FOL
 
 @main.route('/reset_secreto_banco_1234')
 def reset_secreto():
-    # ⚠️ ROTA TÁTICA DE RESET - USAR APENAS UMA VEZ
     try:
         db.drop_all()
         db.create_all()
         
         admin_user = User(name="Administrador", username="admin", role="Admin")
-        admin_user.set_password("admin123") # Senha padrão
+        admin_user.set_password("admin123") 
+        admin_user.must_change_password = False # ⬅️ O Admin não precisa trocar a própria senha ao resetar
         
         db.session.add(admin_user)
         db.session.commit()
-        return "<h1>Senhor! Base de dados (Postgres) recriada com sucesso!</h1><p>A coluna SOLEMP foi inserida e o usuário Admin foi gerado. O senhor já pode acessar o sistema normal.</p>"
+        return "<h1>Senhor! Base de dados (Postgres) recriada com sucesso!</h1><p>A trava de segurança foi inserida. O senhor já pode acessar o sistema normal.</p>"
     except Exception as e:
         return f"Erro ao resetar: {str(e)}"
+
+# ⬅️ NOVA ROTA: Tela de definição de senha obrigatória
+@main.route('/setup_password', methods=['GET', 'POST'])
+def setup_password():
+    if 'user_id' not in session: return redirect(url_for('main.login'))
+    user = User.query.get(session['user_id'])
+    
+    # Se ele já trocou a senha, não tem o que fazer aqui. Joga ele pro dashboard.
+    if not user.must_change_password:
+        return redirect(url_for('main.index'))
+
+    error = None
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if new_password and new_password == confirm_password:
+            user.set_password(new_password)
+            user.must_change_password = False # ⬅️ Libera a trava!
+            db.session.commit()
+            return redirect(url_for('main.index'))
+        else:
+            error = "As senhas não coincidem. Tente novamente."
+
+    return render_template('setup_password.html', error=error, user_name=user.name)
 
 @main.route('/api/check_inbox')
 def check_inbox():

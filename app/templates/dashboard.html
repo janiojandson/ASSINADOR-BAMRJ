@@ -43,6 +43,26 @@
 {% if role == 'Admin' %}
 <div class="card" style="border-top: 5px solid #dc3545;">
     <h3>🛡️ Gestão de Usuários</h3>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ddd;">
+        <h4 style="margin-top:0">➕ Cadastrar Novo Usuário</h4>
+        <form action="{{ url_for('main.create_user') }}" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap;" class="flex-mobile-form">
+            <input type="text" name="name" placeholder="Nome Completo" required style="padding: 8px; flex: 1.5;">
+            <input type="text" name="username" placeholder="Usuário (Login)" required style="padding: 8px; flex: 1;">
+            <input type="password" name="password" placeholder="Senha Inicial" required style="padding: 8px; flex: 1;">
+            <select name="role" required style="padding: 8px; flex: 1;">
+                <option value="Operador">Operador</option>
+                <option value="Enc_Financas">Enc. Finanças</option>
+                <option value="Ajudante_Encarregado">Ajudante do Encarregado</option>
+                <option value="Chefe_Departamento">Chefe de Departamento</option>
+                <option value="Vice_Diretor">Vice-Diretor</option>
+                <option value="Diretor">Diretor</option>
+                <option value="Usuário Comum">Usuário Comum</option>
+            </select>
+            <button type="submit" style="background: #28a745; color: white; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold;">Salvar Usuário</button>
+        </form>
+    </div>
+
     <div class="table-responsive">
         <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
             <thead><tr style="text-align: left; border-bottom: 2px solid #eee;"><th>Nome</th><th>Usuário</th><th>Perfil</th><th>Ações</th></tr></thead>
@@ -61,6 +81,7 @@
                                 <option value="Chefe_Departamento" {% if u.role == 'Chefe_Departamento' %}selected{% endif %}>Chefe Departamento</option>
                                 <option value="Vice_Diretor" {% if u.role == 'Vice_Diretor' %}selected{% endif %}>Vice-Diretor</option>
                                 <option value="Diretor" {% if u.role == 'Diretor' %}selected{% endif %}>Diretor</option>
+                                <option value="Usuário Comum" {% if u.role == 'Usuário Comum' %}selected{% endif %}>Usuário Comum</option>
                             </select>
                         </form>
                     </td>
@@ -117,6 +138,7 @@
 </div>
 {% endif %}
 
+{% if role != 'Admin' %}
 <div class="card">
     {% if role == 'Usuário Comum' and not documents %}
         <h3 style="text-align: center; color: #666;">Utilize a barra de pesquisa acima para buscar Notas de Empenho por CPF/CNPJ ou SOLEMP.</h3>
@@ -193,8 +215,7 @@
         </div>
     {% endif %}
 </div>
-
-<script>
+{% endif %} <script>
 function gerenciarNE(docId) {
     const input = document.getElementById('ne-in-' + docId);
     const view = document.getElementById('ne-view-' + docId);
