@@ -215,7 +215,9 @@
         </div>
     {% endif %}
 </div>
-{% endif %} <script>
+{% endif %} 
+
+<script>
 function gerenciarNE(docId) {
     const input = document.getElementById('ne-in-' + docId);
     const view = document.getElementById('ne-view-' + docId);
@@ -245,10 +247,9 @@ function limparAlerta() {
 }
 
 {% if role != 'Usuário Comum' %}
+// ⬅️ AJUSTE DE PRECISÃO: Sincroniza sempre ao carregar a página
 let contagemInicial = {{ inbox_count | default(0) }};
-if (!sessionStorage.getItem('ultimaContagem')) {
-    sessionStorage.setItem('ultimaContagem', contagemInicial);
-}
+sessionStorage.setItem('ultimaContagem', contagemInicial);
 
 setInterval(function() {
     fetch('/api/check_inbox').then(r => r.json()).then(data => {
