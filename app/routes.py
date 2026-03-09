@@ -78,6 +78,27 @@ def login():
 @main.route('/logout')
 def logout(): session.clear(); return redirect(url_for('main.login'))
 
+# =========================================================================
+# ⬅️ NOVA ROTA: Consulta Pública (SEM SENHA)
+# =========================================================================
+@main.route('/consulta_publica')
+def consulta_publica():
+    search_query = request.args.get('q', '').strip()
+    documents = []
+    
+    if search_query:
+        # Limpa o CPF/CNPJ caso o usuário digite com pontos ou traços
+        search_query_clean = re.sub(r'\D', '', search_query)
+        
+        # Traz apenas processos Arquivados que combinem com o CPF/CNPJ (exato) ou Protocolo (parcial/exato)
+        documents = Document.query.filter(
+            (Document.status == 'Arquivado') & 
+            ((Document.cpf_cnpj == search_query_clean) | (Document.protocol.ilike(f'%{search_query}%')))
+        ).order_by(Document.created_at.desc()).all()
+        
+    return render_template('public_search.html', documents=documents, search_query=search_query)
+# =========================================================================
+
 @main.route('/admin/create_user', methods=['POST'])
 def create_user():
     if session.get('role') != 'Admin': return "Acesso Negado", 403
@@ -267,6 +288,9 @@ def upload_ne(doc_id):
 
 @main.route('/view/<int:doc_id>')
 def view_process(doc_id):
+    # ⬅️ BLOQUEIO DE SEGURANÇA NO VIEWER: Exige estar logado para ver a tela do PDF.js
+    if 'user_id' not in session: return redirect(url_for('main.login'))
+    
     doc = Document.query.get_or_404(doc_id)
     return render_template('viewer.html', doc=doc, role=session.get('role'))
 
@@ -314,7 +338,7 @@ def reset_secreto():
     except Exception as e:
         return f"Erro ao resetar: {str(e)}"
 
-# ⬅️ NOVA ROTA: Tela de definição de senha obrigatória
+# ⬅️ ROTA: Tela de definição de senha obrigatória
 @main.route('/setup_password', methods=['GET', 'POST'])
 def setup_password():
     if 'user_id' not in session: return redirect(url_for('main.login'))
