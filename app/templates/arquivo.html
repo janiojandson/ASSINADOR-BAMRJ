@@ -22,7 +22,7 @@
             let opt = document.createElement('option');
             opt.value = ano;
             opt.innerHTML = ano;
-            const urlParams = newSearchParams(window.location.search);
+            const urlParams = new URLSearchParams(window.location.search);
             const anoPesquisado = urlParams.get('ano');
             if (anoPesquisado && parseInt(anoPesquisado) === ano) {
                 opt.selected = true;
@@ -37,8 +37,13 @@
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <h3 style="margin: 0;">📂 Processos Arquivados</h3>
-        <a href="{{ url_for('main.index') }}" style="background: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;">⬅ Voltar à Caixa de Entrada</a>
-    </div>
+        
+        {% if session.get('user_id') == 0 %}
+            <a href="{{ url_for('main.logout') }}" style="background: #dc3545; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬅ Encerrar Consulta</a>
+        {% else %}
+            <a href="{{ url_for('main.index') }}" style="background: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;">⬅ Voltar à Caixa de Entrada</a>
+        {% endif %}
+        </div>
     
     <div class="table-responsive">
         <table style="width: 100%; border-collapse: collapse; min-width: 800px;">
@@ -47,7 +52,8 @@
                     <th style="padding: 10px;">Protocolo</th>
                     <th style="padding: 10px;">Assunto</th>
                     <th style="padding: 10px;">CPF/CNPJ</th>
-                    <th style="padding: 10px;">SOLEMP</th> <th style="padding: 10px;">Status Final</th>
+                    <th style="padding: 10px;">SOLEMP</th> 
+                    <th style="padding: 10px;">Status Final</th>
                     <th style="padding: 10px;">Ação</th>
                 </tr>
             </thead>
@@ -58,7 +64,8 @@
                     <td style="padding: 10px;"><code>{{ doc.protocol }}</code></td>
                     <td style="padding: 10px;">{{ doc.name }}</td>
                     <td style="padding: 10px;">{{ doc.cpf_cnpj or '-' }}</td>
-                    <td style="padding: 10px;"><strong>{{ doc.solemp or '-' }}</strong></td> <td style="padding: 10px;">
+                    <td style="padding: 10px;"><strong>{{ doc.solemp or '-' }}</strong></td> 
+                    <td style="padding: 10px;">
                         <span style="font-size: 0.8em; padding: 4px 8px; border-radius: 4px; font-weight: bold;
                             {% if doc.status == 'Arquivado' %} background: #d4edda; color: #155724; border: 1px solid #c3e6cb;
                             {% elif doc.status in ['Cancelado', 'Anulado'] %} background: #343a40; color: white;
