@@ -88,7 +88,12 @@
             {% if not documents %}
             <tr>
                 <td colspan="6" style="text-align: center; padding: 30px; color: #666;">
-                    Nenhum processo encontrado no arquivo.
+                    {% if role == 'Usuário Comum' and not search_query %}
+                        <strong style="color: #002244; font-size: 1.1em;">🔍 Consulta de Empenho</strong><br><br>
+                        Digite o número da SOLEMP, CPF/CNPJ, Protocolo ou Nome na barra acima para localizar a sua Nota de Empenho assinada.
+                    {% else %}
+                        Nenhum processo correspondente encontrado.
+                    {% endif %}
                 </td>
             </tr>
             {% endif %}
