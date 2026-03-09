@@ -50,6 +50,10 @@ def index():
         return render_template('dashboard.html', documents=documents, role=role, pre_protocol=f"BAMRJ-{date_str}-{str(uuid.uuid4())[:4].upper()}", inbox_count=inbox_count)
         
     elif role == 'Usuário Comum':
+        # ⬅️ NOVO BLOQUEIO: Não deixa o visitante público (ID 0) ver a tela inicial vazia
+        if session.get('user_id') == 0:
+            return redirect(url_for('main.arquivo'))
+        # Se for um militar real logado, mostra o dashboard vazio
         return render_template('dashboard.html', documents=[], role=role)
         
     elif role in ['Enc_Financas', 'Ajudante_Encarregado']:
