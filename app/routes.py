@@ -79,24 +79,22 @@ def login():
 def logout(): session.clear(); return redirect(url_for('main.login'))
 
 # =========================================================================
-# ⬅️ NOVA ROTA: Consulta Pública (SEM SENHA)
+# ⬅️ NOVA ROTA: Acesso Público Simulado (Substitui a antiga consulta_publica)
 # =========================================================================
-@main.route('/consulta_publica')
-def consulta_publica():
-    search_query = request.args.get('q', '').strip()
-    documents = []
+@main.route('/acesso_publico')
+def acesso_publico():
+    session.clear() # Limpa qualquer resquício de sessão anterior
     
-    if search_query:
-        # Limpa o CPF/CNPJ caso o usuário digite com pontos ou traços
-        search_query_clean = re.sub(r'\D', '', search_query)
-        
-        # Traz apenas processos Arquivados que combinem com o CPF/CNPJ (exato) ou Protocolo (parcial/exato)
-        documents = Document.query.filter(
-            (Document.status == 'Arquivado') & 
-            ((Document.cpf_cnpj == search_query_clean) | (Document.protocol.ilike(f'%{search_query}%')))
-        ).order_by(Document.created_at.desc()).all()
-        
-    return render_template('public_search.html', documents=documents, search_query=search_query)
+    # Injeta uma sessão "falsa" com o perfil de Usuário Comum
+    session.update({
+        'user_id': 0, # ID 0 não existe no banco, então ele passa pelas travas de segurança sem dar erro
+        'username': 'consulta_publica',
+        'name': 'Consulta Pública',
+        'role': 'Usuário Comum'
+    })
+    
+    # Redireciona diretamente para o Arquivo Geral
+    return redirect(url_for('main.arquivo'))
 # =========================================================================
 
 @main.route('/admin/create_user', methods=['POST'])
