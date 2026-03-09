@@ -296,11 +296,14 @@ def view_process(doc_id):
     doc = Document.query.get_or_404(doc_id)
     return render_template('viewer.html', doc=doc, role=session.get('role'))
 
+# =========================================================================
+# ⬅️ ARQUIVO GERAL: Atualizado com Blindagem LGPD para o Público (ID 0)
+# =========================================================================
 @main.route('/arquivo')
 def arquivo():
     if 'user_id' not in session: return redirect(url_for('main.login'))
     
-    # ⬅️ BLOQUEIO DE SEGURANÇA no arquivo também
+    # BLOQUEIO DE SEGURANÇA: Trava para mudança de senha
     user_obj = User.query.get(session['user_id'])
     if user_obj and user_obj.must_change_password:
         return redirect(url_for('main.setup_password'))
@@ -310,16 +313,31 @@ def arquivo():
     search_query_clean = re.sub(r'\D', '', search_query) if search_query else ''
     ano_filtro = request.args.get('ano', str(datetime.now().year))
     
-    query = Document.query.filter(Document.status.in_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])).filter(extract('year', Document.created_at) == int(ano_filtro))
+    # Query base
+    query = Document.query.filter(
+        Document.status.in_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])
+    ).filter(extract('year', Document.created_at) == int(ano_filtro))
+    
     if search_query:
+        # Se digitou algo na busca, pesquisa na base
         query = query.filter(
             (Document.name.ilike(f'%{search_query}%')) | 
             (Document.protocol.ilike(f'%{search_query}%')) | 
             (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
             (Document.solemp.ilike(f'%{search_query_clean}%')) 
         )
-    documents = query.order_by(Document.created_at.desc()).all()
+        documents = query.order_by(Document.created_at.desc()).all()
+    else:
+        # Se NÃO digitou nada na busca:
+        if session.get('user_id') == 0:
+            # Blindagem: Público vê vazio até pesquisar
+            documents = []
+        else:
+            # Militares logados veem o arquivo completo por padrão
+            documents = query.order_by(Document.created_at.desc()).all()
+            
     return render_template('arquivo.html', documents=documents, role=role)
+# =========================================================================
 
 @main.route('/get_pdf/<path:filename>')
 def get_pdf(filename): return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
