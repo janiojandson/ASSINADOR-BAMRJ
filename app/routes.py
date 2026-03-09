@@ -19,6 +19,11 @@ def index():
     
     role = session.get('role'); username = session.get('username')
     is_sub = session.get('is_substitute', False)
+    
+    # ⬅️ REGRA DE NEGÓCIO: Se for o perfil de consulta pública (Usuário Comum), joga direto pro arquivo
+    if role == 'Usuário Comum':
+        return redirect(url_for('main.arquivo'))
+
     search_query = request.args.get('q', '')
     search_query_clean = re.sub(r'\D', '', search_query) if search_query else ''
     ano_filtro = request.args.get('ano', str(datetime.now().year))
@@ -28,18 +33,12 @@ def index():
 
     if search_query:
         base_query = Document.query.filter(extract('year', Document.created_at) == int(ano_filtro))
-        if role == 'Usuário Comum':
-            documents = base_query.filter(
-                (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
-                (Document.solemp.ilike(f'%{search_query_clean}%'))
-            ).filter(Document.status.in_(['Arquivado', 'Cancelado', 'Anulado', 'Reforçado'])).all()
-        else:
-            documents = base_query.filter(
-                (Document.name.ilike(f'%{search_query}%')) | 
-                (Document.protocol.ilike(f'%{search_query}%')) | 
-                (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
-                (Document.solemp.ilike(f'%{search_query_clean}%'))
-            ).all()
+        documents = base_query.filter(
+            (Document.name.ilike(f'%{search_query}%')) | 
+            (Document.protocol.ilike(f'%{search_query}%')) | 
+            (Document.cpf_cnpj.ilike(f'%{search_query_clean}%')) |
+            (Document.solemp.ilike(f'%{search_query_clean}%'))
+        ).all()
         return render_template('dashboard.html', documents=documents, role=role, is_substitute=is_sub)
 
     inbox_statuses = []
@@ -48,13 +47,6 @@ def index():
         date_str = datetime.now().strftime('%Y%m%d')
         inbox_count = sum(1 for d in documents if d.status in ['Devolvido - Operador', 'Aguardando Empenho - Operador'])
         return render_template('dashboard.html', documents=documents, role=role, pre_protocol=f"BAMRJ-{date_str}-{str(uuid.uuid4())[:4].upper()}", inbox_count=inbox_count)
-        
-    elif role == 'Usuário Comum':
-        # ⬅️ NOVO BLOQUEIO: Não deixa o visitante público (ID 0) ver a tela inicial vazia
-        if session.get('user_id') == 0:
-            return redirect(url_for('main.arquivo'))
-        # Se for um militar real logado, mostra o dashboard vazio
-        return render_template('dashboard.html', documents=[], role=role)
         
     elif role in ['Enc_Financas', 'Ajudante_Encarregado']:
         inbox_statuses = ['Caixa de Entrada - Enc. Finanças']
@@ -94,7 +86,7 @@ def acesso_publico():
         'user_id': 0, # ID 0 não existe no banco, então ele passa pelas travas de segurança sem dar erro
         'username': 'consulta_publica',
         'name': 'Consulta Pública',
-        'role': 'Usuário Comum'
+        'role': 'Usuário Comum' # ⬅️ Aqui aplicamos o perfil que definimos estrategicamente
     })
     
     # Redireciona diretamente para o Arquivo Geral
@@ -297,7 +289,7 @@ def view_process(doc_id):
     return render_template('viewer.html', doc=doc, role=session.get('role'))
 
 # =========================================================================
-# ⬅️ ARQUIVO GERAL: Atualizado com Blindagem LGPD para o Público (ID 0)
+# ⬅️ ARQUIVO GERAL: Atualizado com Blindagem LGPD para a "Consulta sem login"
 # =========================================================================
 @main.route('/arquivo')
 def arquivo():
@@ -309,7 +301,7 @@ def arquivo():
         return redirect(url_for('main.setup_password'))
         
     role = session.get('role')
-    search_query = request.args.get('q', '')
+    search_query = request.args.get('q', '').strip()
     search_query_clean = re.sub(r'\D', '', search_query) if search_query else ''
     ano_filtro = request.args.get('ano', str(datetime.now().year))
     
@@ -328,15 +320,15 @@ def arquivo():
         )
         documents = query.order_by(Document.created_at.desc()).all()
     else:
-        # Se NÃO digitou nada na busca:
-        if session.get('user_id') == 0:
-            # Blindagem: Público vê vazio até pesquisar
+        # ⬅️ REGRA DE NEGÓCIO: Público não vê a lista geral, a tabela fica vazia!
+        if role == 'Usuário Comum':
             documents = []
         else:
-            # Militares logados veem o arquivo completo por padrão
+            # Militares logados (Operador/Chefia) veem o arquivo completo por padrão
             documents = query.order_by(Document.created_at.desc()).all()
             
-    return render_template('arquivo.html', documents=documents, role=role)
+    # Retornamos search_query para que o template saiba se o usuário já tentou pesquisar algo
+    return render_template('arquivo.html', documents=documents, role=role, search_query=search_query)
 # =========================================================================
 
 @main.route('/get_pdf/<path:filename>')
